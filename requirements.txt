@@ -2,6 +2,7 @@ streamlit
 pandas
 numpy
 plotly
+matplotlib
+reportlab
 supabase==2.10.0
 httpx==0.27.2
-matplotlib
