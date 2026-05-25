@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 + Guidance Explanations v2"
+BUILD_LABEL = "Clean Phase 5 + Tax Estimator v3"
 
 # ------------------------------------------------------------
 # Styling
@@ -112,6 +112,13 @@ def init_state():
         "tax_rate": 18.0,
         "roth_conversion": 0,
         "aca_target_income": 60000,
+        "filing_status": "Married Filing Jointly",
+        "tax_year": "2026",
+        "state_tax_rate": 4.25,
+        "taxable_ss_percent": 85.0,
+        "other_taxable_income": 0,
+        "itemized_deductions": 0,
+        "use_itemized": False,
         "spouse_enabled": False,
         "spouse_age": 53,
         "spouse_income": 0,
@@ -139,6 +146,7 @@ PLAN_INPUT_KEYS = [
     "bucket2_return", "bucket1_years", "home_equity", "home_value", "mortgage",
     "healthcare_monthly", "inflation", "growth_return", "safe_return",
     "tax_rate", "roth_conversion", "aca_target_income",
+    "filing_status", "tax_year", "state_tax_rate", "taxable_ss_percent", "other_taxable_income", "itemized_deductions", "use_itemized",
     "spouse_enabled", "spouse_age", "spouse_income", "spouse_ss", "spouse_ss_start_age",
     "phase2_compare_ages", "sidebar_age", "sidebar_retire_age", "sidebar_monthly_spending",
     "p5_plan_name", "p5_tags", "p5_notes",
@@ -833,6 +841,102 @@ def show_phase2():
     )
 
 
+
+# ------------------------------------------------------------
+# Simplified federal tax estimator helpers
+# ------------------------------------------------------------
+STANDARD_DEDUCTIONS_2026 = {
+    "Single": 16100,
+    "Married Filing Jointly": 32200,
+    "Head of Household": 24150,
+}
+
+FEDERAL_BRACKETS_2026 = {
+    "Single": [
+        (0, 12400, 0.10),
+        (12400, 50400, 0.12),
+        (50400, 105700, 0.22),
+        (105700, 201775, 0.24),
+        (201775, 256225, 0.32),
+        (256225, 640600, 0.35),
+        (640600, float("inf"), 0.37),
+    ],
+    "Married Filing Jointly": [
+        (0, 24800, 0.10),
+        (24800, 100800, 0.12),
+        (100800, 211400, 0.22),
+        (211400, 403550, 0.24),
+        (403550, 512450, 0.32),
+        (512450, 768700, 0.35),
+        (768700, float("inf"), 0.37),
+    ],
+    "Head of Household": [
+        (0, 17700, 0.10),
+        (17700, 67450, 0.12),
+        (67450, 105700, 0.22),
+        (105700, 201775, 0.24),
+        (201775, 256200, 0.32),
+        (256200, 640600, 0.35),
+        (640600, float("inf"), 0.37),
+    ],
+}
+
+
+def calc_progressive_tax(taxable_income, brackets):
+    taxable_income = max(0, float(taxable_income))
+    total = 0.0
+    marginal_rate = 0.0
+    bracket_rows = []
+    for lower, upper, rate in brackets:
+        if taxable_income <= lower:
+            break
+        taxed_amount = min(taxable_income, upper) - lower
+        taxed_amount = max(0, taxed_amount)
+        tax = taxed_amount * rate
+        total += tax
+        if taxed_amount > 0:
+            marginal_rate = rate
+        bracket_rows.append({
+            "Bracket": f"{int(rate*100)}%",
+            "Taxable dollars in bracket": taxed_amount,
+            "Estimated tax from bracket": tax,
+        })
+    effective_rate = total / taxable_income if taxable_income > 0 else 0
+    return total, marginal_rate, effective_rate, bracket_rows
+
+
+def estimate_taxable_income_components(gross_income, withdrawal_need):
+    ss_taxable = st.session_state.social_security * (st.session_state.taxable_ss_percent / 100)
+    if st.session_state.spouse_enabled:
+        ss_taxable += st.session_state.spouse_ss * (st.session_state.taxable_ss_percent / 100)
+    ordinary_income = (
+        ss_taxable
+        + st.session_state.pension_income
+        + st.session_state.other_income
+        + st.session_state.other_taxable_income
+        + withdrawal_need
+        + st.session_state.roth_conversion
+    )
+    filing_status = st.session_state.filing_status
+    standard = STANDARD_DEDUCTIONS_2026.get(filing_status, 16100)
+    deduction = max(float(st.session_state.itemized_deductions), standard) if st.session_state.use_itemized else standard
+    taxable_income = max(0, ordinary_income - deduction)
+    return {
+        "taxable_social_security": ss_taxable,
+        "ordinary_income_before_deduction": ordinary_income,
+        "deduction": deduction,
+        "taxable_income": taxable_income,
+    }
+
+
+def format_tax_brackets_for_display(filing_status):
+    rows = []
+    for lower, upper, rate in FEDERAL_BRACKETS_2026.get(filing_status, FEDERAL_BRACKETS_2026["Single"]):
+        high = "and up" if upper == float("inf") else money(upper)
+        rows.append({"Rate": f"{int(rate*100)}%", "Taxable income range": f"{money(lower)} to {high}"})
+    return pd.DataFrame(rows)
+
+
 def withdrawal_strategy_rules(age, retire_age, ss_start_age, traditional, roth, taxable_cash, hsa_balance, bucket1_balance, spending, guaranteed, tax_rate, aca_target, roth_conversion, rule55_eligible, aca_sensitive, rmd_concern, market_downturn):
     """Simple educational rule engine for tax-smart withdrawal order."""
     withdrawal_need = max(0, spending - guaranteed)
@@ -912,6 +1016,21 @@ def show_phase3():
     )
     st.markdown("<div class='soft-box'>This is a planning estimate, not tax advice. The goal is to show pressure points and help users know what to ask a financial or tax professional.</div>", unsafe_allow_html=True)
 
+    st.subheader("Filing status & tax setup")
+    t1, t2, t3, t4 = st.columns(4)
+    t1.selectbox("Filing status", ["Single", "Married Filing Jointly", "Head of Household"], key="filing_status", help="Choose the tax filing status to estimate the federal brackets and standard deduction. Married Filing Jointly usually applies to spouses filing one combined return.")
+    t2.selectbox("Tax year", ["2026"], key="tax_year", help="The tax estimator currently uses simplified 2026 federal brackets and standard deductions.")
+    t3.number_input("State tax rate (%)", min_value=0.0, max_value=15.0, step=0.25, key="state_tax_rate", help="Estimated state income tax rate. Some states have no income tax; others tax retirement income differently. Use this as a planning placeholder.")
+    t4.number_input("Taxable Social Security (%)", min_value=0.0, max_value=85.0, step=5.0, key="taxable_ss_percent", help="Federal rules can make up to 85% of Social Security taxable depending on provisional income. Use 85% for conservative planning, lower if income is modest.")
+
+    t5, t6, t7 = st.columns(3)
+    t5.number_input("Other taxable income", min_value=0, step=1000, key="other_taxable_income", help="Interest, dividends, taxable side income, rental income, or other ordinary taxable income not already entered elsewhere.")
+    t6.checkbox("Use itemized deductions", key="use_itemized", help="Check this if itemized deductions may exceed the standard deduction.")
+    if st.session_state.use_itemized:
+        t7.number_input("Itemized deductions", min_value=0, step=1000, key="itemized_deductions", help="Estimated deductible mortgage interest, charitable giving, eligible taxes, medical deductions, and other itemized deductions.")
+    else:
+        t7.metric("Standard deduction", money(STANDARD_DEDUCTIONS_2026.get(st.session_state.filing_status, 16100)))
+
     st.subheader("Income & tax assumptions")
     c1, c2, c3 = st.columns(3)
     c1.number_input("Estimated effective tax rate (%)", min_value=0.0, max_value=40.0, step=0.5, key="tax_rate", help="Estimated average tax rate on retirement income. This is not a tax filing calculation, just a planning assumption.")
@@ -921,7 +1040,13 @@ def show_phase3():
     gross_income = guaranteed_income()
     spending = annual_spending()
     withdrawal_need = max(0, spending - gross_income)
-    estimated_tax = (gross_income + withdrawal_need + st.session_state.roth_conversion) * st.session_state.tax_rate / 100
+    tax_components = estimate_taxable_income_components(gross_income, withdrawal_need)
+    federal_tax, marginal_rate, effective_rate, bracket_rows = calc_progressive_tax(
+        tax_components["taxable_income"],
+        FEDERAL_BRACKETS_2026.get(st.session_state.filing_status, FEDERAL_BRACKETS_2026["Single"]),
+    )
+    state_tax = tax_components["taxable_income"] * st.session_state.state_tax_rate / 100
+    estimated_tax = federal_tax + state_tax
     after_tax_gap = max(0, spending + estimated_tax - gross_income)
     rmd_age = 75
     years_to_rmd = max(0, rmd_age - st.session_state.age)
@@ -933,6 +1058,40 @@ def show_phase3():
     b.metric("Portfolio Withdrawal Need", money(withdrawal_need))
     c.metric("Estimated Tax", money(estimated_tax))
     d.metric("Estimated First RMD", money(estimated_rmd))
+
+    st.markdown("### Federal tax estimate by filing status")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Taxable Income", money(tax_components["taxable_income"]))
+    k2.metric("Federal Tax", money(federal_tax))
+    k3.metric("Marginal Rate", f"{marginal_rate*100:.0f}%")
+    k4.metric("Effective Federal Rate", f"{effective_rate*100:.1f}%")
+
+    with st.expander("Show taxable income breakdown and bracket table", expanded=False):
+        breakdown_df = pd.DataFrame([
+            {"Component": "Taxable Social Security estimate", "Amount": tax_components["taxable_social_security"]},
+            {"Component": "Pension income", "Amount": st.session_state.pension_income},
+            {"Component": "Other income", "Amount": st.session_state.other_income},
+            {"Component": "Other taxable income", "Amount": st.session_state.other_taxable_income},
+            {"Component": "Portfolio withdrawal need", "Amount": withdrawal_need},
+            {"Component": "Roth conversion tested", "Amount": st.session_state.roth_conversion},
+            {"Component": "Deduction used", "Amount": -tax_components["deduction"]},
+            {"Component": "Estimated taxable income", "Amount": tax_components["taxable_income"]},
+        ])
+        st.dataframe(breakdown_df, use_container_width=True, hide_index=True, column_config={"Amount": st.column_config.NumberColumn(format="$%d")})
+
+        bracket_col, tax_col = st.columns(2)
+        with bracket_col:
+            st.markdown(f"**2026 federal brackets — {st.session_state.filing_status}**")
+            st.dataframe(format_tax_brackets_for_display(st.session_state.filing_status), use_container_width=True, hide_index=True)
+        with tax_col:
+            st.markdown("**Estimated tax by bracket**")
+            bracket_tax_df = pd.DataFrame(bracket_rows)
+            if not bracket_tax_df.empty:
+                st.dataframe(bracket_tax_df, use_container_width=True, hide_index=True, column_config={"Taxable dollars in bracket": st.column_config.NumberColumn(format="$%d"), "Estimated tax from bracket": st.column_config.NumberColumn(format="$%d")})
+            else:
+                st.info("No federal tax estimated after deductions.")
+
+    st.info("Tax notes: this is a simplified federal ordinary-income estimate. It does not fully calculate capital gains, qualified dividends, Medicare IRMAA, AMT, credits, deductions phaseouts, state-specific exclusions, or exact Social Security taxation formulas.")
 
     income_df = pd.DataFrame({
         "Source": ["Social Security", "Pension", "Other Income", "Portfolio Withdrawal"],
