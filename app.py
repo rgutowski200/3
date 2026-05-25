@@ -103,7 +103,21 @@ defaults = {
     "phase1_tax_rate": 18.0,
     "phase1_aca_magi_target": 60000,
     "phase1_bad_market": -20.0,
+
+    "phase3_pension": 0,
+    "phase3_part_time": 0,
+    "phase3_rental_income": 0,
+    "phase3_other_income": 0,
+    "phase3_federal_tax_rate": 12.0,
+    "phase3_state_tax_rate": 4.0,
+    "phase3_roth_conversion": 0,
+    "phase3_conversion_tax_rate": 18.0,
+    "phase3_rmd_age": 75,
+    "phase3_taxable_balance_pct": 80.0,
+    "phase3_aca_target_magi": 60000,
+    "phase3_current_magi": 0,
 }
+
 
 for key, value in defaults.items():
     if key not in st.session_state:
@@ -203,7 +217,7 @@ with st.sidebar:
     else:
         st.info("Free dashboard mode")
 
-    st.caption("Build: Phase 2 v2 — fixed comparison defaults")
+    st.caption("Build: Phase 3 v1 — income and tax lab")
 
     st.markdown("### Quick Assumptions")
     st.text_input("Plan name", key="plan_name")
@@ -212,7 +226,7 @@ with st.sidebar:
     st.number_input("Estimated monthly spend", min_value=0, step=500, key="sidebar_monthly_spend", value=st.session_state.phase1_monthly_spending)
 
     st.divider()
-    st.caption("Build: Clean Phase 2 v1")
+    st.caption("Clean build: Dashboard + Phase 1 + Phase 2 + Phase 3")
 
 # ----------------------------
 # Dashboard
@@ -604,6 +618,186 @@ def show_phase2():
     else:
         st.success("The plan looks more stable when retirement age, guaranteed income, and portfolio withdrawals are balanced.")
 
+
+
+# ----------------------------
+# Phase 3 — Income & Tax
+# ----------------------------
+def estimate_future_rmd_balance():
+    start_age = st.session_state.phase1_age
+    rmd_age = st.session_state.phase3_rmd_age
+    years = max(0, rmd_age - start_age)
+    traditional_balance = st.session_state.phase1_portfolio * (st.session_state.phase3_taxable_balance_pct / 100)
+    growth = st.session_state.phase1_growth_return / 100
+    return traditional_balance * ((1 + growth) ** years)
+
+
+def show_phase3():
+    st.markdown("# Phase 3 — Income & Tax")
+    st.write("Estimate retirement income sources, withdrawal needs, taxes, Roth conversion pressure, ACA planning, and future RMD risk.")
+
+    st.markdown(
+        """
+        <div class="blue-banner">
+        This is a planning estimate, not tax advice. Use it to see the direction of your income and tax picture before working with a CPA or financial planner.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    tabs = st.tabs([
+        "1. Income Sources",
+        "2. Withdrawal Need",
+        "3. Tax Estimate",
+        "4. Roth Conversion Test",
+        "5. RMD Preview",
+        "6. Takeaway",
+    ])
+
+    base_ss = st.session_state.phase1_social_security
+    if st.session_state.phase1_spouse_enabled:
+        base_ss += st.session_state.phase1_spouse_ss
+
+    with tabs[0]:
+        st.subheader("Income Sources")
+        st.write("Add guaranteed and semi-guaranteed income that may reduce portfolio withdrawals.")
+
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("Social Security", money(base_ss))
+        with c2:
+            st.number_input("Annual pension income", min_value=0, step=1000, key="phase3_pension")
+        with c3:
+            st.number_input("Annual part-time income", min_value=0, step=1000, key="phase3_part_time")
+        with c4:
+            st.number_input("Rental / other income", min_value=0, step=1000, key="phase3_rental_income")
+
+        st.number_input("Other annual income", min_value=0, step=1000, key="phase3_other_income")
+
+        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
+        st.success(f"Estimated annual non-portfolio income: {money(total_income)}")
+
+    with tabs[1]:
+        st.subheader("Withdrawal Need")
+        spending = annual_spending()
+        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
+        withdrawal_need = max(0, spending - total_income)
+        withdrawal_rate = withdrawal_need / max(st.session_state.phase1_portfolio, 1) * 100
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Annual Spending", money(spending))
+        c2.metric("Non-Portfolio Income", money(total_income))
+        c3.metric("Portfolio Withdrawal Need", money(withdrawal_need), f"{withdrawal_rate:.1f}% of portfolio")
+
+        if withdrawal_rate <= 4:
+            st.success("Withdrawal pressure looks reasonable under a basic 4% rule check.")
+        elif withdrawal_rate <= 6:
+            st.warning("Withdrawal pressure is moderate. This may work, but timing, taxes, and market returns matter more.")
+        else:
+            st.error("Withdrawal pressure is high. Consider reducing spending, delaying retirement, adding income, or adjusting the plan.")
+
+    with tabs[2]:
+        st.subheader("Tax Estimate")
+        st.write("Use simple effective tax rates for now. Later we can replace this with bracket-based federal and state logic.")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.slider("Estimated federal effective tax rate", 0.0, 35.0, key="phase3_federal_tax_rate")
+        with c2:
+            st.slider("Estimated state/local effective tax rate", 0.0, 15.0, key="phase3_state_tax_rate")
+
+        spending = annual_spending()
+        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
+        withdrawal_need = max(0, spending - total_income)
+        taxable_income_est = max(0, withdrawal_need + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income)
+        total_tax_rate = (st.session_state.phase3_federal_tax_rate + st.session_state.phase3_state_tax_rate) / 100
+        tax_est = taxable_income_est * total_tax_rate
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Estimated Taxable Income", money(taxable_income_est))
+        c2.metric("Estimated Annual Tax", money(tax_est))
+        c3.metric("After-Tax Withdrawal Need", money(withdrawal_need + tax_est))
+
+    with tabs[3]:
+        st.subheader("Roth Conversion Test")
+        st.write("Test whether converting some traditional retirement money to Roth could lower future tax/RMD pressure.")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.number_input("Annual Roth conversion to test", min_value=0, step=5000, key="phase3_roth_conversion")
+        with c2:
+            st.slider("Estimated conversion tax rate", 0.0, 40.0, key="phase3_conversion_tax_rate")
+
+        conversion_tax = st.session_state.phase3_roth_conversion * (st.session_state.phase3_conversion_tax_rate / 100)
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Conversion Amount", money(st.session_state.phase3_roth_conversion))
+        c2.metric("Estimated Tax Cost", money(conversion_tax))
+        c3.metric("Net Amount Shifted", money(max(0, st.session_state.phase3_roth_conversion - conversion_tax)))
+
+        if st.session_state.phase3_roth_conversion > 0:
+            st.info("This does not prove a Roth conversion is right, but it shows the upfront tax cost and helps compare against future RMD pressure.")
+        else:
+            st.info("Enter a test conversion amount to see the estimated tax cost.")
+
+    with tabs[4]:
+        st.subheader("RMD Preview")
+        st.write("Estimate how large traditional pre-tax balances could become before RMDs begin.")
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.number_input("RMD starting age", min_value=73, max_value=80, key="phase3_rmd_age")
+        with c2:
+            st.slider("Percent of portfolio that is traditional/pre-tax", 0.0, 100.0, key="phase3_taxable_balance_pct")
+
+        future_rmd_balance = estimate_future_rmd_balance()
+        estimated_first_rmd = future_rmd_balance / 24.6
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Projected Pre-Tax Balance", money(future_rmd_balance))
+        c2.metric("Estimated First RMD", money(estimated_first_rmd))
+        c3.metric("RMD Risk", "High" if estimated_first_rmd > 75000 else "Moderate" if estimated_first_rmd > 35000 else "Lower")
+
+        if estimated_first_rmd > 75000:
+            st.warning("Future RMDs could create tax pressure. Roth conversions before RMD age may be worth testing.")
+        else:
+            st.success("Estimated RMD pressure appears manageable under these assumptions.")
+
+    with tabs[5]:
+        st.subheader("Plain-English Takeaway")
+
+        spending = annual_spending()
+        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
+        withdrawal_need = max(0, spending - total_income)
+        withdrawal_rate = withdrawal_need / max(st.session_state.phase1_portfolio, 1) * 100
+        future_rmd_balance = estimate_future_rmd_balance()
+        estimated_first_rmd = future_rmd_balance / 24.6
+
+        points = []
+        if withdrawal_rate <= 4:
+            points.append("Your retirement income sources cover enough spending that portfolio withdrawals look reasonable.")
+        elif withdrawal_rate <= 6:
+            points.append("Your withdrawal need is workable but needs careful monitoring, especially in the first 5–10 years.")
+        else:
+            points.append("Your withdrawal need is high, so the plan may need a retirement delay, lower spending, or more guaranteed income.")
+
+        if estimated_first_rmd > 75000:
+            points.append("Your future RMD estimate is large enough that Roth conversion planning may become important.")
+        else:
+            points.append("Your future RMD estimate does not look extreme under these assumptions.")
+
+        if st.session_state.phase1_retire_age < 65:
+            points.append("Because retirement is before Medicare, healthcare bridge costs should stay visible in the plan.")
+
+        for point in points:
+            st.write(f"• {point}")
+
+        st.markdown("### Next best move")
+        if withdrawal_rate > 6:
+            st.error("Focus first on lowering spending, delaying retirement, or increasing guaranteed income.")
+        elif estimated_first_rmd > 75000:
+            st.warning("Run several Roth conversion scenarios before RMD age.")
+        else:
+            st.success("Move forward to Phase 4 Lifestyle once your income and tax assumptions feel reasonable.")
+
 # ----------------------------
 # Placeholder Pages
 # ----------------------------
@@ -633,7 +827,7 @@ elif page == "Phase 1 — Foundation":
 elif page == "Phase 2 — Retirement Lab":
     show_phase2()
 elif page == "Phase 3 — Income & Tax":
-    locked_or_placeholder("Phase 3 — Income & Tax", "Plan Social Security, taxes, Roth conversions, ACA, and RMDs.")
+    show_phase3()
 elif page == "Phase 4 — Lifestyle":
     locked_or_placeholder("Phase 4 — Lifestyle", "Compare best places to retire, lifestyle fit, state taxes, and snowbird options.")
 elif page == "Phase 5 — My Plans":
