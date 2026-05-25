@@ -2,13 +2,15 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import json
+from datetime import datetime
 
 st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 4 Lifestyle v1"
+BUILD_LABEL = "Clean Phase 5 My Plans v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -112,6 +114,8 @@ def init_state():
             st.session_state[k] = v
 
 init_state()
+if "saved_plans" not in st.session_state:
+    st.session_state.saved_plans = []
 
 # ------------------------------------------------------------
 # Data helpers
@@ -283,7 +287,7 @@ def show_dashboard():
     c.metric("Portfolio Total", money(portfolio_total()))
 
     st.markdown("### Your Next Steps")
-    st.write("1. Complete Phase 1 inputs.  2. Use Phase 2 to compare retirement ages.  3. Use Phase 3 to test income and tax strategy.  4. Use Phase 4 to compare retirement locations.")
+    st.write("1. Complete Phase 1 inputs.  2. Compare retirement ages in Phase 2.  3. Test income and tax strategy in Phase 3.  4. Compare lifestyle locations in Phase 4.  5. Save your best blueprint in Phase 5.")
 
 
 def show_phase1():
@@ -622,6 +626,162 @@ def show_phase4():
     st.markdown(f"<div class='success-box'><b>Plain-English recommendation:</b> Based on your priorities, start deeper research with <b>{top_place['Place']}, {top_place['State']}</b> and compare it against your current Michigan lifestyle. The next step is to verify housing cost, property taxes, insurance, healthcare networks, and how it feels during both peak and off-season months.</div>", unsafe_allow_html=True)
 
 
+
+def build_recommendations():
+    score = readiness_score()
+    spend = annual_spending()
+    income = guaranteed_income()
+    gap = max(0, spend - income)
+    portfolio = max(portfolio_total(), 1)
+    withdrawal_rate = gap / portfolio * 100
+    recs = []
+    if score < 60:
+        recs.append("Improve the foundation first: reduce retirement spending, delay retirement, increase savings, or add guaranteed income.")
+    else:
+        recs.append("Your foundation is moving in the right direction. Focus next on tax strategy, healthcare bridge planning, and stress testing.")
+    if withdrawal_rate > 5:
+        recs.append("Portfolio withdrawal pressure looks high. Test a lower monthly spending target or a later retirement age in the Retirement Lab.")
+    elif withdrawal_rate > 4:
+        recs.append("Withdrawal pressure is moderate. Stress test early market downturns before relying on this plan.")
+    else:
+        recs.append("Withdrawal pressure appears reasonable using this simplified model. Keep validating with taxes, inflation, and healthcare costs.")
+    if st.session_state.retire_age < 65:
+        recs.append("Because retirement is before Medicare, build a healthcare bridge estimate and keep a dedicated cash/bond buffer.")
+    if st.session_state.traditional > st.session_state.roth * 3:
+        recs.append("Traditional pre-tax balances are much larger than Roth balances. Explore Roth conversion windows before RMD age.")
+    if st.session_state.spouse_enabled:
+        recs.append("Because a spouse is included, eventually model survivor income, Social Security timing, and the widow/widower tax risk.")
+    return recs[:5]
+
+
+def current_plan_snapshot():
+    score = readiness_score()
+    income = guaranteed_income()
+    spend = annual_spending()
+    portfolio = portfolio_total()
+    gap = max(0, spend - income)
+    return {
+        "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "plan_name": st.session_state.get("p5_plan_name", st.session_state.plan_name),
+        "retirement_age": int(st.session_state.retire_age),
+        "planning_horizon": int(st.session_state.plan_age),
+        "readiness_score": int(score),
+        "confidence": confidence_label(score),
+        "annual_spending": float(spend),
+        "guaranteed_income": float(income),
+        "portfolio": float(portfolio),
+        "portfolio_gap": float(gap),
+        "withdrawal_rate": float(gap / max(portfolio, 1) * 100),
+        "home_equity": float(st.session_state.home_equity),
+        "spouse_included": bool(st.session_state.spouse_enabled),
+        "notes": st.session_state.get("p5_notes", ""),
+        "tags": st.session_state.get("p5_tags", []),
+        "recommendations": build_recommendations(),
+    }
+
+
+def show_phase5():
+    st.title("Phase 5 — My Plans")
+    st.write("Turn your inputs into a saved retirement blueprint with notes, assumptions, action steps, and next-best recommendations.")
+    st.markdown("<div class='soft-box'>This version saves plans locally during your current browser session. Once the app is stable, we can add login and permanent database saving.</div>", unsafe_allow_html=True)
+
+    score = readiness_score()
+    income = guaranteed_income()
+    spend = annual_spending()
+    portfolio = portfolio_total()
+    gap = max(0, spend - income)
+    withdrawal_rate = gap / max(portfolio, 1) * 100
+
+    st.subheader("Current Blueprint Snapshot")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Readiness Score", f"{score}/100", confidence_label(score))
+    c2.metric("Target Retirement", f"Age {st.session_state.retire_age}")
+    c3.metric("Annual Spending", money(spend))
+    c4.metric("Withdrawal Rate", f"{withdrawal_rate:.1f}%")
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=["Guaranteed Income", "Portfolio Gap"], y=[income, gap], text=[money(income), money(gap)], textposition="auto"))
+    fig.update_layout(height=330, title="How Your Annual Retirement Spending Is Covered", yaxis_tickprefix="$", margin=dict(l=10, r=10, t=50, b=10))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+    st.subheader("Plan Details")
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        st.text_input("Plan name", key="p5_plan_name", value=st.session_state.get("p5_plan_name", st.session_state.plan_name))
+        st.multiselect("Plan tags", ["Base Plan", "Conservative", "Aggressive", "Early Retirement", "Snowbird", "Downsize", "Tax Focus", "Healthcare Focus"], default=st.session_state.get("p5_tags", ["Base Plan"]), key="p5_tags")
+    with c2:
+        st.text_area("Plan notes", key="p5_notes", placeholder="Example: Retire at 60, delay Social Security to 67, test South Carolina snowbird lifestyle, reduce spending after 70...")
+
+    st.subheader("Recommended Next Steps")
+    recs = build_recommendations()
+    for i, rec in enumerate(recs, start=1):
+        st.markdown(f"**{i}.** {rec}")
+
+    st.subheader("Action Checklist")
+    left, right = st.columns(2)
+    with left:
+        st.checkbox("Confirm Social Security estimate from SSA.gov", key="p5_check_ss")
+        st.checkbox("Complete detailed monthly budget", key="p5_check_budget")
+        st.checkbox("Estimate healthcare bridge costs before Medicare", key="p5_check_healthcare")
+        st.checkbox("Compare at least three retirement ages", key="p5_check_ages")
+    with right:
+        st.checkbox("Review Roth conversion opportunity", key="p5_check_roth")
+        st.checkbox("Compare at least three retirement locations", key="p5_check_locations")
+        st.checkbox("Stress test bad first 3 years of market returns", key="p5_check_stress")
+        st.checkbox("Discuss plan with a qualified financial/tax professional", key="p5_check_pro")
+
+    checks = ["p5_check_ss", "p5_check_budget", "p5_check_healthcare", "p5_check_ages", "p5_check_roth", "p5_check_locations", "p5_check_stress", "p5_check_pro"]
+    completed = sum(1 for k in checks if st.session_state.get(k))
+    st.progress(completed / len(checks), text=f"Blueprint completion checklist: {completed} of {len(checks)} completed")
+
+    st.divider()
+    st.subheader("Save This Blueprint")
+    c1, c2, c3 = st.columns([1, 1, 1])
+    if c1.button("Save current plan", use_container_width=True):
+        snap = current_plan_snapshot()
+        st.session_state.saved_plans.append(snap)
+        st.success(f"Saved: {snap['plan_name']}")
+    if c2.button("Clear saved plans", use_container_width=True):
+        st.session_state.saved_plans = []
+        st.warning("Saved plans cleared for this session.")
+
+    snapshot = current_plan_snapshot()
+    c3.download_button(
+        "Download plan JSON",
+        data=json.dumps(snapshot, indent=2),
+        file_name=f"{snapshot['plan_name'].replace(' ', '_').lower()}_retirement_blueprint.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+    st.subheader("Saved Plans This Session")
+    if not st.session_state.saved_plans:
+        st.info("No saved plans yet. Save your current blueprint above.")
+    else:
+        rows = []
+        for idx, plan in enumerate(st.session_state.saved_plans, start=1):
+            rows.append({
+                "#": idx,
+                "Plan": plan["plan_name"],
+                "Saved": plan["saved_at"],
+                "Retire Age": plan["retirement_age"],
+                "Score": plan["readiness_score"],
+                "Confidence": plan["confidence"],
+                "Annual Spending": money(plan["annual_spending"]),
+                "Portfolio": money(plan["portfolio"]),
+                "Withdrawal Rate": f"{plan['withdrawal_rate']:.1f}%",
+                "Tags": ", ".join(plan.get("tags", [])),
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        selected_idx = st.selectbox("Review saved plan detail", list(range(1, len(st.session_state.saved_plans) + 1)), format_func=lambda i: st.session_state.saved_plans[i-1]["plan_name"])
+        selected_plan = st.session_state.saved_plans[selected_idx - 1]
+        st.markdown(f"<div class='success-box'><b>{selected_plan['plan_name']}</b><br>Saved {selected_plan['saved_at']} • Confidence: {selected_plan['confidence']} • Readiness Score: {selected_plan['readiness_score']}/100</div>", unsafe_allow_html=True)
+        with st.expander("View plan notes and recommendations"):
+            st.write(selected_plan.get("notes") or "No notes added.")
+            for rec in selected_plan.get("recommendations", []):
+                st.write(f"• {rec}")
+
 def placeholder(title):
     st.title(title)
     st.info("This phase is coming next. The goal is to build one stable phase at a time.")
@@ -637,7 +797,7 @@ elif nav == "Phase 3 — Income & Tax":
 elif nav == "Phase 4 — Lifestyle":
     show_phase4()
 elif nav == "Phase 5 — My Plans":
-    placeholder("Phase 5 — My Plans")
+    show_phase5()
 elif nav == "Reports":
     placeholder("Reports")
 elif nav == "AI Coach":
