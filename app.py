@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Readiness Meter v1"
+BUILD_LABEL = "Equal dashboard cards v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -28,8 +28,21 @@ st.markdown(
         border: 1px solid #e6eaf0;
         border-radius: 18px;
         padding: 22px;
-        min-height: 160px;
+        min-height: 345px;
+        height: 345px;
         box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+        overflow: hidden;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        min-height: 345px;
+        height: 345px;
+        border-radius: 18px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+        overflow: hidden;
+    }
+    div[data-testid="stPlotlyChart"] {
+        margin-top: -4px;
+        margin-bottom: -12px;
     }
     .metric-label {font-size: 0.92rem; font-weight: 700; color: #111827; margin-bottom: 18px;}
     .metric-value {font-size: 2.2rem; font-weight: 800; color: #111827; line-height: 1.1;}
