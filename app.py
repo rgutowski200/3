@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Reports v1"
+BUILD_LABEL = "Clean Phase 2 Return Projection v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -429,30 +429,137 @@ def phase2_table(compare_ages, return_scenario):
 
 def show_phase2():
     st.title("Phase 2 — Retirement Lab")
-    st.write("Compare retirement ages, test withdrawal pressure, and see whether the plan survives through your planning age.")
-    st.markdown("<div class='soft-box'>This lab uses your Phase 1 inputs. Try different retirement ages and watch how the ending portfolio, bridge years, and first-year withdrawal needs change.</div>", unsafe_allow_html=True)
+    st.write("Compare retirement ages, adjust average returns, and see how much the portfolio could grow or shrink over time.")
+    st.markdown("<div class='soft-box'>This lab uses your Phase 1 inputs. Adjust the return rate, retirement age, and planning age to see a projection table, chart, and plain-English takeaway.</div>", unsafe_allow_html=True)
 
-    default_ages = sorted(set([st.session_state.retire_age, 62, 65, 67]))
-    c1, c2 = st.columns([2, 1])
-    compare_ages = c1.multiselect("Retirement ages to compare", list(range(50, 76)), default=default_ages, key="phase2_compare_ages_widget")
-    scenario = c2.selectbox("Return scenario", ["Conservative", "Base", "Bad first years"], index=1)
+    default_ages = sorted(set([int(st.session_state.retire_age), 62, 65, 67]))
+
+    c1, c2, c3 = st.columns([2, 1, 1])
+    compare_ages = c1.multiselect(
+        "Retirement ages to compare",
+        list(range(50, 76)),
+        default=default_ages,
+        key="phase2_compare_ages_widget",
+    )
+    selected_return = c2.slider(
+        "Average annual return (%)",
+        min_value=0.0,
+        max_value=25.0,
+        value=min(25.0, max(0.0, float(st.session_state.growth_return))),
+        step=0.25,
+        key="phase2_avg_return",
+        help="Use this to test conservative, base, optimistic, or very aggressive long-term return assumptions.",
+    )
+    projection_view = c3.selectbox(
+        "Projection view",
+        ["Selected return", "Compare 4% / 6% / 8%", "Bear / Base / Bull"],
+        key="phase2_projection_view",
+    )
+
     if not compare_ages:
         st.warning("Choose at least one retirement age to compare.")
         return
 
-    result = phase2_table(compare_ages, scenario)
+    # Scenario table by retirement age using the selected return rate
+    result = phase2_table(compare_ages, "Base")
+    manual_rows = []
+    for age in compare_ages:
+        df_age = project_portfolio(retire_age=age, return_rate=selected_return)
+        retire_port = df_age.loc[df_age["Age"] == age, "Portfolio"].iloc[0] if age in df_age["Age"].values else df_age["Portfolio"].iloc[0]
+        end_port = df_age["Portfolio"].iloc[-1]
+        first_withdrawal = max(0, annual_spending() - guaranteed_income())
+        bridge_years = max(0, 65 - int(age))
+        healthcare_bridge = bridge_years * float(st.session_state.healthcare_monthly) * 12
+        score = int(max(0, min(100, 55 + (end_port / max(portfolio_total(), 1)) * 20 - bridge_years * 3)))
+        manual_rows.append({
+            "Retire Age": int(age),
+            "Readiness Score": score,
+            "Portfolio at Retirement": retire_port,
+            "Ending Portfolio": end_port,
+            "First-Year Portfolio Need": first_withdrawal,
+            "Healthcare Bridge": healthcare_bridge,
+        })
+    result = pd.DataFrame(manual_rows)
+
+    st.subheader("Retirement Age Comparison")
     display = result.copy()
     for col in ["Portfolio at Retirement", "Ending Portfolio", "First-Year Portfolio Need", "Healthcare Bridge"]:
         display[col] = display[col].apply(money)
     st.dataframe(display, use_container_width=True, hide_index=True)
 
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=result["Retire Age"], y=result["Ending Portfolio"], name="Ending Portfolio"))
-    fig.update_layout(height=350, title="Ending Portfolio by Retirement Age", yaxis_tickprefix="$", xaxis_title="Retirement Age")
-    st.plotly_chart(fig, use_container_width=True)
+    fig_bar = go.Figure()
+    fig_bar.add_trace(go.Bar(x=result["Retire Age"], y=result["Ending Portfolio"], name="Ending Portfolio"))
+    fig_bar.update_layout(
+        height=340,
+        title=f"Ending Portfolio by Retirement Age at {selected_return:.2f}% Return",
+        yaxis_tickprefix="$",
+        xaxis_title="Retirement Age",
+        margin=dict(l=10, r=10, t=55, b=10),
+    )
+    st.plotly_chart(fig_bar, use_container_width=True)
+
+    st.divider()
+    st.subheader("Return Rate Projection")
+    st.write("This shows how much the portfolio may be worth each year based on the return assumption and retirement withdrawal need.")
+
+    if projection_view == "Selected return":
+        return_scenarios = {f"Selected Return {selected_return:.2f}%": selected_return}
+    elif projection_view == "Compare 4% / 6% / 8%":
+        return_scenarios = {"Conservative 4%": 4.0, "Moderate 6%": 6.0, "Growth 8%": 8.0}
+    else:
+        return_scenarios = {"Bear 3%": 3.0, f"Base {selected_return:.2f}%": selected_return, "Bull 9%": 9.0}
+
+    projection_rows = []
+    fig_line = go.Figure()
+    for label, rate in return_scenarios.items():
+        df_proj = project_portfolio(retire_age=st.session_state.retire_age, return_rate=rate)
+        fig_line.add_trace(go.Scatter(x=df_proj["Age"], y=df_proj["Portfolio"], mode="lines", name=label, line=dict(width=3)))
+        for _, row in df_proj.iterrows():
+            projection_rows.append({
+                "Scenario": label,
+                "Age": int(row["Age"]),
+                "Portfolio": row["Portfolio"],
+                "Annual Withdrawal": row["Withdrawal"],
+            })
+
+    fig_line.add_vline(x=st.session_state.retire_age, line_dash="dash", annotation_text="Retire")
+    fig_line.add_vline(x=st.session_state.ss_start_age, line_dash="dot", annotation_text="Social Security")
+    fig_line.update_layout(
+        height=420,
+        title="Portfolio Projection by Return Assumption",
+        yaxis_tickprefix="$",
+        xaxis_title="Age",
+        yaxis_title="Portfolio",
+        margin=dict(l=10, r=10, t=55, b=10),
+    )
+    st.plotly_chart(fig_line, use_container_width=True)
+
+    projection_df = pd.DataFrame(projection_rows)
+    table_df = projection_df.copy()
+    table_df["Portfolio"] = table_df["Portfolio"].apply(money)
+    table_df["Annual Withdrawal"] = table_df["Annual Withdrawal"].apply(money)
+    st.subheader("Projection Table")
+    st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+    csv = projection_df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "Download projection CSV",
+        data=csv,
+        file_name="retirement_return_projection.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
 
     best = result.sort_values("Readiness Score", ascending=False).iloc[0]
-    st.markdown(f"<div class='success-box'><b>Plain-English takeaway:</b> Based on the current assumptions, retiring at <b>{int(best['Retire Age'])}</b> produces the strongest score in this comparison. The biggest pressure points are healthcare bridge years before Medicare and the annual portfolio withdrawal need.</div>", unsafe_allow_html=True)
+    selected_df = project_portfolio(retire_age=st.session_state.retire_age, return_rate=selected_return)
+    ending_balance = selected_df["Portfolio"].iloc[-1]
+    retirement_balance = selected_df.loc[selected_df["Age"] == st.session_state.retire_age, "Portfolio"].iloc[0] if st.session_state.retire_age in selected_df["Age"].values else selected_df["Portfolio"].iloc[0]
+    total_growth = max(0, retirement_balance - portfolio_total())
+
+    st.markdown(
+        f"<div class='success-box'><b>Plain-English takeaway:</b> At a <b>{selected_return:.2f}%</b> average return, your portfolio could grow by about <b>{money(total_growth)}</b> before retirement at age <b>{int(st.session_state.retire_age)}</b>. In this comparison, retiring at <b>{int(best['Retire Age'])}</b> has the strongest score. The biggest pressure points are the healthcare bridge before Medicare and the annual portfolio withdrawal need.</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def show_phase3():
