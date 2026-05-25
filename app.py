@@ -750,9 +750,12 @@ def show_phase2():
         key="bucket2_return",
         help="Expected annual return for the growth bucket. This is usually higher, but also assumes more volatility.",
     )
-    if r3.button("Auto-split from portfolio", use_container_width=True, help="Sets Bucket 1 to your annual spending times your target Bucket 1 years, then puts the rest in Bucket 2."):
-        auto_bucket_split()
-        st.rerun()
+    r3.button(
+        "Auto-split from portfolio",
+        use_container_width=True,
+        help="Sets Bucket 1 to your annual spending times your target Bucket 1 years, then puts the rest in Bucket 2.",
+        on_click=auto_bucket_split,
+    )
 
     blended = bucket_blended_return()
     total_bucket = bucket_total()
