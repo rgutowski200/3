@@ -246,10 +246,10 @@ with st.sidebar:
 
     st.divider()
     st.markdown("### Quick Assumptions")
-    st.text_input("Plan name", key="plan_name")
-    st.number_input("Your age", min_value=45, max_value=90, key="sidebar_age", step=1, on_change=sync_from_sidebar)
-    st.slider("Target retirement age", 50, 75, key="sidebar_retire_age", on_change=sync_from_sidebar)
-    st.number_input("Estimated monthly spend", min_value=0, step=500, key="sidebar_monthly_spending", on_change=sync_from_sidebar)
+    st.text_input("Plan name", key="plan_name", help="Give this retirement scenario a name, such as Base Plan, Retire at 60, or Snowbird Plan.")
+    st.number_input("Your age", min_value=45, max_value=90, key="sidebar_age", step=1, on_change=sync_from_sidebar, help="Your current age today. This drives retirement timing, growth years, Social Security timing, and Medicare bridge years.")
+    st.slider("Target retirement age", 50, 75, key="sidebar_retire_age", on_change=sync_from_sidebar, help="The age you hope to stop full-time work and begin relying on retirement income.")
+    st.number_input("Estimated monthly spend", min_value=0, step=500, key="sidebar_monthly_spending", on_change=sync_from_sidebar, help="Your estimated average monthly retirement spending. Use a quick estimate here; Phase 1 has a detailed budget builder.")
     st.caption(f"Build: {BUILD_LABEL}")
 
 # ------------------------------------------------------------
@@ -323,12 +323,12 @@ def show_phase1():
     with tabs[0]:
         st.subheader("Household Basics")
         c1, c2, c3 = st.columns(3)
-        c1.text_input("First name", key="name")
-        c2.number_input("Current age", min_value=45, max_value=90, key="phase1_age", value=int(st.session_state.age))
-        c3.slider("Retirement age", 50, 75, key="phase1_retire_age", value=int(st.session_state.retire_age))
+        c1.text_input("First name", key="name", help="Used only to personalize the dashboard greeting and report language.")
+        c2.number_input("Current age", min_value=45, max_value=90, key="phase1_age", value=int(st.session_state.age), help="Your current age today. The app uses this to calculate how many years you have until retirement and how long the plan must last.")
+        c3.slider("Retirement age", 50, 75, key="phase1_retire_age", value=int(st.session_state.retire_age), help="The age you want to test for retirement. You can compare multiple ages later in Phase 2.")
         c4, c5 = st.columns(2)
-        c4.slider("Plan through age", 75, 100, key="plan_age")
-        planning_depth = c5.selectbox("Planning depth", ["Simple", "Standard", "Advanced"], index=1)
+        c4.slider("Plan through age", 75, 100, key="plan_age", help="The age the projection should run through. Many retirement plans use age 90 or 95 to test longevity risk.")
+        planning_depth = c5.selectbox("Planning depth", ["Simple", "Standard", "Advanced"], index=1, help="Choose how detailed the planning should be. Simple is quick, Standard adds major assumptions, and Advanced includes tax and strategy details.")
         if st.button("Apply household updates", on_click=apply_household_updates):
             st.success("Household updates applied.")
         if planning_depth == "Advanced":
@@ -337,10 +337,10 @@ def show_phase1():
     with tabs[1]:
         st.subheader("Income")
         c1, c2, c3 = st.columns(3)
-        c1.number_input("Current household income", min_value=0, step=5000, key="current_income")
-        c2.number_input("Annual pension income", min_value=0, step=1000, key="pension_income")
-        c3.number_input("Other annual income", min_value=0, step=1000, key="other_income")
-        st.text_area("Other income notes", placeholder="Rental income, part-time work, annuity, business income...")
+        c1.number_input("Current household income", min_value=0, step=5000, key="current_income", help="Your current annual household earned income before taxes. This helps estimate savings ability and retirement transition risk.")
+        c2.number_input("Annual pension income", min_value=0, step=1000, key="pension_income", help="Expected annual pension income in retirement, if any. Enter the yearly amount before taxes.")
+        c3.number_input("Other annual income", min_value=0, step=1000, key="other_income", help="Other recurring yearly retirement income, such as rental income, annuity income, part-time work, or business income.")
+        st.text_area("Other income notes", placeholder="Rental income, part-time work, annuity, business income...", help="Optional notes about where other income comes from and whether it is guaranteed, temporary, or uncertain.")
 
     with tabs[2]:
         st.subheader("Spending")
@@ -350,6 +350,7 @@ def show_phase1():
             step=500,
             key="phase1_monthly_spending",
             value=int(st.session_state.monthly_spending),
+            help="Your estimated average monthly spending in retirement. Include normal living costs, travel, insurance, healthcare, hobbies, and recurring bills.",
         )
         if st.button("Apply spending update"):
             st.session_state.monthly_spending = st.session_state.phase1_monthly_spending
@@ -360,7 +361,7 @@ def show_phase1():
             total = 0
             for i, cat in enumerate(cats):
                 with cols[i % 2]:
-                    total += st.number_input(cat, min_value=0, step=100, key=f"budget_{cat.lower().replace(' ', '_')}")
+                    total += st.number_input(cat, min_value=0, step=100, key=f"budget_{cat.lower().replace(' ', '_')}", help=f"Estimated monthly spending for {cat.lower()} in retirement.")
             if st.button("Use detailed budget total"):
                 st.session_state.monthly_spending = total
                 st.success(f"Monthly spending updated to {money(total)}.")
@@ -368,29 +369,29 @@ def show_phase1():
     with tabs[3]:
         st.subheader("Social Security")
         c1, c2 = st.columns(2)
-        c1.number_input("Your annual Social Security", min_value=0, step=1000, key="social_security")
-        c2.slider("Your Social Security start age", 62, 70, key="ss_start_age")
+        c1.number_input("Your annual Social Security", min_value=0, step=1000, key="social_security", help="Your estimated annual Social Security benefit at the claiming age you selected. Use your SSA.gov estimate if available.")
+        c2.slider("Your Social Security start age", 62, 70, key="ss_start_age", help="The age you expect to start Social Security. Claiming earlier usually lowers monthly benefits; delaying can increase them.")
 
     with tabs[4]:
         st.subheader("Assets & Debt")
         c1, c2, c3 = st.columns(3)
-        c1.number_input("Traditional 401k / IRA", min_value=0, step=10000, key="traditional")
-        c2.number_input("Roth balance", min_value=0, step=10000, key="roth")
-        c3.number_input("Taxable / cash", min_value=0, step=10000, key="taxable_cash")
+        c1.number_input("Traditional 401k / IRA", min_value=0, step=10000, key="traditional", help="Current balance in pre-tax retirement accounts such as traditional 401(k), traditional IRA, 403(b), or similar accounts.")
+        c2.number_input("Roth balance", min_value=0, step=10000, key="roth", help="Current Roth retirement balance. Roth money may provide tax-free withdrawals if rules are met.")
+        c3.number_input("Taxable / cash", min_value=0, step=10000, key="taxable_cash", help="Taxable brokerage, savings, money market, CDs, checking, or other non-retirement cash/investments.")
         c4, c5 = st.columns(2)
-        c4.number_input("Home value", min_value=0, step=10000, key="home_value")
-        c5.number_input("Mortgage balance", min_value=0, step=10000, key="mortgage")
+        c4.number_input("Home value", min_value=0, step=10000, key="home_value", help="Estimated current market value of your home. This helps estimate home equity and downsizing flexibility.")
+        c5.number_input("Mortgage balance", min_value=0, step=10000, key="mortgage", help="Remaining mortgage balance or other debt secured by the home.")
         st.session_state.home_equity = max(0, st.session_state.home_value - st.session_state.mortgage)
 
     with tabs[5]:
         st.subheader("Spouse / Partner")
-        st.checkbox("Include spouse or partner", key="spouse_enabled")
+        st.checkbox("Include spouse or partner", key="spouse_enabled", help="Turn this on if your retirement plan should include a spouse or partner’s age, income, and Social Security.")
         if st.session_state.spouse_enabled:
             c1, c2, c3 = st.columns(3)
-            c1.number_input("Spouse age", min_value=45, max_value=90, key="spouse_age")
-            c2.number_input("Spouse annual income", min_value=0, step=5000, key="spouse_income")
-            c3.number_input("Spouse annual Social Security", min_value=0, step=1000, key="spouse_ss")
-            st.slider("Spouse Social Security start age", 62, 70, key="spouse_ss_start_age")
+            c1.number_input("Spouse age", min_value=45, max_value=90, key="spouse_age", help="Your spouse or partner’s current age. This affects retirement timing, Social Security timing, and survivor planning.")
+            c2.number_input("Spouse annual income", min_value=0, step=5000, key="spouse_income", help="Your spouse or partner’s current annual earned income before taxes.")
+            c3.number_input("Spouse annual Social Security", min_value=0, step=1000, key="spouse_ss", help="Estimated annual Social Security benefit for your spouse or partner at their selected claiming age.")
+            st.slider("Spouse Social Security start age", 62, 70, key="spouse_ss_start_age", help="The age your spouse or partner expects to claim Social Security.")
         else:
             st.info("No spouse or partner is included in this plan.")
 
@@ -440,6 +441,7 @@ def show_phase2():
         list(range(50, 76)),
         default=default_ages,
         key="phase2_compare_ages_widget",
+        help="Choose the retirement ages you want to compare side-by-side, such as 58, 62, 65, and 67.",
     )
     selected_return = c2.slider(
         "Average annual return (%)",
@@ -454,6 +456,7 @@ def show_phase2():
         "Projection view",
         ["Selected return", "Compare 4% / 6% / 8%", "Bear / Base / Bull"],
         key="phase2_projection_view",
+        help="Choose whether to view only your selected return or compare multiple return scenarios.",
     )
 
     if not compare_ages:
@@ -568,9 +571,9 @@ def show_phase3():
     st.markdown("<div class='soft-box'>This is a planning estimate, not tax advice. The goal is to show pressure points and help users know what to ask a financial or tax professional.</div>", unsafe_allow_html=True)
 
     c1, c2, c3 = st.columns(3)
-    c1.number_input("Estimated effective tax rate (%)", min_value=0.0, max_value=40.0, step=0.5, key="tax_rate")
-    c2.number_input("Annual Roth conversion to test", min_value=0, step=5000, key="roth_conversion")
-    c3.number_input("ACA target MAGI", min_value=0, step=5000, key="aca_target_income")
+    c1.number_input("Estimated effective tax rate (%)", min_value=0.0, max_value=40.0, step=0.5, key="tax_rate", help="Estimated average tax rate on retirement income. This is not a tax filing calculation, just a planning assumption.")
+    c2.number_input("Annual Roth conversion to test", min_value=0, step=5000, key="roth_conversion", help="Amount of traditional IRA/401(k) money to model converting into Roth each year. This may raise taxes now but reduce future RMD pressure.")
+    c3.number_input("ACA target MAGI", min_value=0, step=5000, key="aca_target_income", help="Target Modified Adjusted Gross Income before Medicare age if you want to model ACA health insurance subsidy flexibility.")
 
     gross_income = guaranteed_income()
     spending = annual_spending()
@@ -671,20 +674,20 @@ def show_phase4():
 
     st.subheader("What matters most to you?")
     c1, c2, c3 = st.columns(3)
-    w_tax = c1.slider("Tax importance", 1, 10, 8, key="p4_tax_weight")
-    w_cost = c2.slider("Cost of living importance", 1, 10, 7, key="p4_cost_weight")
-    w_health = c3.slider("Healthcare importance", 1, 10, 8, key="p4_health_weight")
+    w_tax = c1.slider("Tax importance", 1, 10, 8, key="p4_tax_weight", help="How important low retirement taxes are in your location ranking. Higher means taxes matter more.")
+    w_cost = c2.slider("Cost of living importance", 1, 10, 7, key="p4_cost_weight", help="How important affordable housing, everyday expenses, and general cost of living are to you.")
+    w_health = c3.slider("Healthcare importance", 1, 10, 8, key="p4_health_weight", help="How important healthcare access and quality are in your retirement location ranking.")
     c4, c5, c6 = st.columns(3)
-    w_life = c4.slider("Lifestyle importance", 1, 10, 8, key="p4_lifestyle_weight")
-    w_climate = c5.slider("Climate importance", 1, 10, 7, key="p4_climate_weight")
-    w_golf = c6.slider("Golf / recreation importance", 1, 10, 7, key="p4_golf_weight")
+    w_life = c4.slider("Lifestyle importance", 1, 10, 8, key="p4_lifestyle_weight", help="How important restaurants, culture, community, recreation, and overall lifestyle fit are.")
+    w_climate = c5.slider("Climate importance", 1, 10, 7, key="p4_climate_weight", help="How important weather, warmth, winter avoidance, and seasonal comfort are.")
+    w_golf = c6.slider("Golf / recreation importance", 1, 10, 7, key="p4_golf_weight", help="How important golf access, outdoor activities, clubs, parks, and recreation are.")
 
     weights = {"Tax": w_tax, "Cost": w_cost, "Healthcare": w_health, "Lifestyle": w_life, "Climate": w_climate, "Golf": w_golf}
 
     c1, c2, c3 = st.columns(3)
-    preferred = c1.multiselect("Preferred states, optional", [s["State"] for s in STATE_DATA], default=[], key="p4_preferred")
-    avoid = c2.multiselect("States to avoid, optional", [s["State"] for s in STATE_DATA], default=[], key="p4_avoid")
-    snowbird = c3.checkbox("Interested in snowbird strategy?", value=True, key="p4_snowbird")
+    preferred = c1.multiselect("Preferred states, optional", [s["State"] for s in STATE_DATA], default=[], key="p4_preferred", help="Optional boost for states you already like or want to prioritize.")
+    avoid = c2.multiselect("States to avoid, optional", [s["State"] for s in STATE_DATA], default=[], key="p4_avoid", help="Optional list of states you do not want recommended.")
+    snowbird = c3.checkbox("Interested in snowbird strategy?", value=True, key="p4_snowbird", help="Check this if you might keep one home base and spend winters in a warmer state.")
 
     states = pd.DataFrame(STATE_DATA)
     states = states[~states["State"].isin(avoid)].copy()
@@ -711,7 +714,7 @@ def show_phase4():
 
     st.divider()
     st.subheader("City / Place-Level Recommendations")
-    filter_states = st.multiselect("Filter places by state", [s["State"] for s in STATE_DATA], default=[], key="p4_place_filter")
+    filter_states = st.multiselect("Filter places by state", [s["State"] for s in STATE_DATA], default=[], key="p4_place_filter", help="Limit city/place recommendations to selected states, or leave blank to compare all available places.")
     places = pd.DataFrame(PLACE_DATA)
     if filter_states:
         places = places[places["State"].isin(filter_states)].copy()
@@ -731,7 +734,7 @@ def show_phase4():
     st.dataframe(place_display, use_container_width=True, hide_index=True)
 
     st.subheader("Place Detail")
-    choice = st.selectbox("Choose a place to review", (places["Place"] + ", " + places["State"]).tolist(), key="p4_place_detail")
+    choice = st.selectbox("Choose a place to review", (places["Place"] + ", " + places["State"]).tolist(), key="p4_place_detail", help="Pick a specific city/community to see score details, strengths, and watch-outs.")
     selected = places[(places["Place"] + ", " + places["State"]) == choice].iloc[0]
     d1, d2, d3, d4, d5 = st.columns(5)
     d1.metric("Fit Score", f"{selected['Recommended Fit Score']:.0f}/100")
@@ -747,7 +750,7 @@ def show_phase4():
     st.divider()
     st.subheader("State-to-State Comparison")
     default_compare = ["Michigan", "Florida", "South Carolina"]
-    compare = st.multiselect("Choose states to compare", [s["State"] for s in STATE_DATA], default=default_compare, key="p4_state_compare")
+    compare = st.multiselect("Choose states to compare", [s["State"] for s in STATE_DATA], default=default_compare, key="p4_state_compare", help="Select states for a side-by-side comparison of taxes, costs, healthcare, climate, lifestyle, and watch-outs.")
     compare_df = states[states["State"].isin(compare)].copy()
     if not compare_df.empty:
         fig3 = go.Figure()
@@ -845,10 +848,10 @@ def show_phase5():
     st.subheader("Plan Details")
     c1, c2 = st.columns([1, 1])
     with c1:
-        st.text_input("Plan name", key="p5_plan_name", value=st.session_state.get("p5_plan_name", st.session_state.plan_name))
-        st.multiselect("Plan tags", ["Base Plan", "Conservative", "Aggressive", "Early Retirement", "Snowbird", "Downsize", "Tax Focus", "Healthcare Focus"], default=st.session_state.get("p5_tags", ["Base Plan"]), key="p5_tags")
+        st.text_input("Plan name", key="p5_plan_name", value=st.session_state.get("p5_plan_name", st.session_state.plan_name), help="Name this saved blueprint so you can identify it later, such as Retire at 60 or South Carolina Snowbird Plan.")
+        st.multiselect("Plan tags", ["Base Plan", "Conservative", "Aggressive", "Early Retirement", "Snowbird", "Downsize", "Tax Focus", "Healthcare Focus"], default=st.session_state.get("p5_tags", ["Base Plan"]), key="p5_tags", help="Optional labels to organize saved plans by strategy or theme.")
     with c2:
-        st.text_area("Plan notes", key="p5_notes", placeholder="Example: Retire at 60, delay Social Security to 67, test South Carolina snowbird lifestyle, reduce spending after 70...")
+        st.text_area("Plan notes", key="p5_notes", placeholder="Example: Retire at 60, delay Social Security to 67, test South Carolina snowbird lifestyle, reduce spending after 70...", help="Optional notes about this version of your plan, tradeoffs, assumptions, or follow-up questions.")
 
     st.subheader("Recommended Next Steps")
     recs = build_recommendations()
@@ -911,7 +914,7 @@ def show_phase5():
                 "Tags": ", ".join(plan.get("tags", [])),
             })
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-        selected_idx = st.selectbox("Review saved plan detail", list(range(1, len(st.session_state.saved_plans) + 1)), format_func=lambda i: st.session_state.saved_plans[i-1]["plan_name"])
+        selected_idx = st.selectbox("Review saved plan detail", list(range(1, len(st.session_state.saved_plans) + 1)), format_func=lambda i: st.session_state.saved_plans[i-1]["plan_name"], help="Choose a saved plan from this browser session to review its details and notes.")
         selected_plan = st.session_state.saved_plans[selected_idx - 1]
         st.markdown(f"<div class='success-box'><b>{selected_plan['plan_name']}</b><br>Saved {selected_plan['saved_at']} • Confidence: {selected_plan['confidence']} • Readiness Score: {selected_plan['readiness_score']}/100</div>", unsafe_allow_html=True)
         with st.expander("View plan notes and recommendations"):
