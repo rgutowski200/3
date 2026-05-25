@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 + Two Bucket + Withdrawal Optimizer v1"
+BUILD_LABEL = "Clean Phase 5 + Guidance Explanations v2"
 
 # ------------------------------------------------------------
 # Styling
@@ -208,6 +208,18 @@ def pct(x):
     return f"{float(x):.0f}%"
 
 
+def section_guide(title, how_to_use, what_it_tells_you, tips=None):
+    """Reusable guidance box for each major app section."""
+    with st.expander(f"ℹ️ How to use this section — {title}", expanded=False):
+        st.markdown("**How to use it**")
+        st.markdown(how_to_use)
+        st.markdown("**What it tells you**")
+        st.markdown(what_it_tells_you)
+        if tips:
+            st.markdown("**Tips**")
+            st.markdown(tips)
+
+
 def annual_spending():
     return float(st.session_state.monthly_spending) * 12
 
@@ -403,6 +415,12 @@ def show_dashboard():
 
     st.title(f"Good morning, {st.session_state.name}!")
     st.write("Here’s your retirement readiness overview.")
+    section_guide(
+        "Dashboard",
+        "Use this page as your quick command center. Review the scorecards first, then use the timeline chart and next steps to decide which phase needs attention.",
+        "It summarizes your current retirement picture: readiness score, projected retirement age, estimated monthly retirement income, confidence level, bridge years before Medicare, annual spending, and total portfolio.",
+        "If something looks off, start in Phase 1 to clean up inputs. If the score is lower than expected, use Phase 2 and Phase 3 to test retirement age, returns, withdrawal order, and taxes."
+    )
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
@@ -456,6 +474,12 @@ def show_dashboard():
 def show_phase1():
     st.title("Phase 1 — Financial Foundation")
     st.write("Build the base retirement picture: income, spending, assets, debt, Social Security, and optional spouse planning.")
+    section_guide(
+        "Phase 1 — Financial Foundation",
+        "Enter the core facts about your household: age, target retirement age, income, spending, Social Security, assets, debt, and spouse/partner information if applicable. Use rough numbers at first, then come back later with more detail.",
+        "This phase creates the baseline used by the entire app. The dashboard, Retirement Lab, Income & Tax section, Lifestyle engine, My Plans, and Reports all pull from these inputs.",
+        "Best practice: start simple, then improve accuracy over time. Spending and Social Security are usually the two fields that most change the output."
+    )
     st.markdown("<div class='soft-box'>Free users can enter basic estimates. Premium users can go deeper with category spending, other income sources, spouse planning, and Social Security assumptions.</div>", unsafe_allow_html=True)
 
     tabs = st.tabs(["1. Household", "2. Income", "3. Spending", "4. Social Security", "5. Assets & Debt", "6. Spouse / Partner"])
@@ -571,6 +595,12 @@ def phase2_table(compare_ages, return_scenario):
 def show_phase2():
     st.title("Phase 2 — Retirement Lab")
     st.write("Compare retirement ages, adjust average returns, and see how much the portfolio could grow or shrink over time.")
+    section_guide(
+        "Phase 2 — Retirement Lab",
+        "Use this phase to experiment. Compare different retirement ages, adjust expected return rates from 0% to 25%, and test your two-bucket strategy with separate safe and growth returns.",
+        "It shows how retirement timing and investment assumptions affect projected portfolio value, withdrawal pressure, healthcare bridge years, and overall retirement confidence.",
+        "Do not treat high return settings as guaranteed. Use conservative, base, and optimistic assumptions to understand your range of outcomes."
+    )
     st.markdown("<div class='soft-box'>This lab uses your Phase 1 inputs. Adjust the return rate, retirement age, and planning age to see a projection table, chart, and plain-English takeaway.</div>", unsafe_allow_html=True)
 
     default_ages = sorted(set([int(st.session_state.retire_age), 62, 65, 67]))
@@ -602,6 +632,12 @@ def show_phase2():
     st.divider()
     st.subheader("Two-Bucket Strategy")
     st.write("Model a safer near-term bucket and a growth bucket with different return assumptions.")
+    section_guide(
+        "Two-Bucket Strategy",
+        "Put near-term spending money in Bucket 1 and long-term growth money in Bucket 2. Then assign each bucket its own return rate.",
+        "This estimates a blended portfolio return and helps show whether you have enough safer money to cover early retirement spending without selling growth assets during a downturn.",
+        "A common starting point is 2–3 years of spending in Bucket 1, but the right amount depends on risk comfort, income sources, and market conditions."
+    )
 
     b1, b2, b3 = st.columns(3)
     b1.number_input(
@@ -868,6 +904,12 @@ def withdrawal_strategy_rules(age, retire_age, ss_start_age, traditional, roth, 
 def show_phase3():
     st.title("Phase 3 — Income & Tax")
     st.write("Estimate retirement income sources, portfolio withdrawal need, tax pressure, Roth conversion impact, future RMD risk, and a tax-smart account drawdown order.")
+    section_guide(
+        "Phase 3 — Income & Tax",
+        "Enter tax assumptions, Roth conversion ideas, account balances, and healthcare/tax sensitivity. Then review the income mix, estimated tax pressure, RMD preview, and withdrawal order recommendations.",
+        "This phase helps identify which income sources may cover spending, how much may need to come from investments, and which account types may be most tax-efficient to draw from first.",
+        "This is educational planning, not tax advice. The goal is to surface questions and scenarios to review with a tax professional or financial advisor."
+    )
     st.markdown("<div class='soft-box'>This is a planning estimate, not tax advice. The goal is to show pressure points and help users know what to ask a financial or tax professional.</div>", unsafe_allow_html=True)
 
     st.subheader("Income & tax assumptions")
@@ -903,6 +945,12 @@ def show_phase3():
     st.divider()
     st.subheader("Tax-Smart Withdrawal Order Optimizer")
     st.write("This module recommends which account types to consider drawing from first based on age, taxes, healthcare sensitivity, RMD pressure, and your bucket strategy.")
+    section_guide(
+        "Withdrawal Order Optimizer",
+        "Enter balances for cash/taxable accounts, traditional IRA/401(k), Roth accounts, and HSA. Then check whether Rule of 55, ACA sensitivity, RMD concerns, or market downturn mode apply.",
+        "It produces a suggested account drawdown order, watch-outs, and tax-saving opportunities based on your situation.",
+        "The recommendation changes depending on age, pre-Medicare healthcare needs, RMD pressure, and whether you want to preserve Roth assets for later."
+    )
 
     c1, c2, c3, c4 = st.columns(4)
     c1.number_input("Taxable / cash balance", min_value=0, step=10000, key="taxable_cash", help="Money in savings, money market, CDs, taxable brokerage, or other non-retirement accounts available for flexible withdrawals.")
@@ -1026,6 +1074,12 @@ def place_score(row, weights):
 def show_phase4():
     st.title("Phase 4 — Lifestyle & Best Places to Retire")
     st.write("Compare states and places based on taxes, cost, healthcare, climate, golf/recreation, lifestyle fit, and your personal priorities.")
+    section_guide(
+        "Phase 4 — Lifestyle & Best Places to Retire",
+        "Adjust the priority sliders to tell the app what matters most: taxes, cost of living, healthcare, lifestyle, climate, and golf/recreation. Then review state rankings, place details, and state-to-state comparisons.",
+        "It creates a personalized location score and helps compare where retirement may be more affordable, enjoyable, or practical based on your preferences.",
+        "Use this as a short-listing tool. Before moving, users should still verify local housing costs, insurance, healthcare networks, and tax rules."
+    )
     st.markdown("<div class='soft-box'>This is where the retirement plan becomes personal. A financially possible retirement should also fit the life you actually want.</div>", unsafe_allow_html=True)
 
     st.subheader("What matters most to you?")
@@ -1185,6 +1239,12 @@ def current_plan_snapshot():
 def show_phase5():
     st.title("Phase 5 — My Plans")
     st.write("Turn your inputs into a saved retirement blueprint with notes, assumptions, action steps, and next-best recommendations.")
+    section_guide(
+        "Phase 5 — My Plans",
+        "Name your plan, add notes and tags, review recommendations, complete checklist items, then save or export your plan for later.",
+        "This phase turns the analysis into an action plan. It captures your current assumptions, readiness score, recommendations, notes, and saved plan versions.",
+        "Create separate plans for major choices, such as Retire at 58, Retire at 62, Florida Snowbird, Downsize, or Conservative Market Case."
+    )
     st.markdown("<div class='soft-box'>This version saves plans locally during your current browser session. Once the app is stable, we can add login and permanent database saving.</div>", unsafe_allow_html=True)
 
     score = readiness_score()
@@ -1412,6 +1472,12 @@ h2 {{ color:#061A3A; margin-top:28px; }}
 def show_reports():
     st.title("Reports")
     st.write("Create a simple retirement blueprint report that summarizes your dashboard, Phase 1 inputs, Phase 2 retirement timing, Phase 3 income/tax picture, Phase 4 lifestyle priorities, and Phase 5 action plan.")
+    section_guide(
+        "Reports",
+        "Use this page after entering your inputs and testing scenarios. Review the executive summary, recommendations, and projection table, then download the report or data files.",
+        "It gives users a simple snapshot they can save, share with a spouse, or bring to a financial/tax professional.",
+        "The report is only as accurate as the inputs. Encourage users to update assumptions before relying on the summary."
+    )
     st.markdown("<div class='soft-box'>This report is local to your session for now. Later we can add branded PDFs, advisor-ready reports, and permanent saved report history.</div>", unsafe_allow_html=True)
 
     snapshot = current_plan_snapshot()
