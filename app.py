@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 + Tax Estimator + AI Coach v1"
+BUILD_LABEL = "Clean Phase 5 + Tax Estimator + AI Coach + Resources v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -1879,6 +1879,154 @@ Keep the API key in Streamlit Secrets only. Do not paste it into GitHub.
 """)
 
 
+
+def show_resources():
+    st.title("Resources")
+    section_guide(
+        "Resources",
+        "Use this page as the plain-English learning center for retirement concepts. It helps users understand what each strategy means before they use the tools.",
+        "It explains retirement terms, planning rules, Social Security, taxes, Roth conversions, healthcare bridge years, bucket strategy, withdrawal planning, and lifestyle/location planning.",
+        "When a user feels unsure about a term or strategy, send them here first. This section builds trust and lowers confusion."
+    )
+
+    st.markdown("<div class='soft-box'>Educational content only. These resources help explain concepts so users can have better conversations with qualified financial, tax, legal, or healthcare professionals.</div>", unsafe_allow_html=True)
+
+    search = st.text_input(
+        "Search resources",
+        placeholder="Try: Roth conversion, Rule of 55, RMD, bucket strategy, Social Security...",
+        help="Search is a simple guide for now. Future versions can filter the glossary and articles dynamically."
+    )
+
+    tabs = st.tabs([
+        "Start Here",
+        "Glossary",
+        "Retirement Rules",
+        "Taxes & Withdrawals",
+        "Healthcare",
+        "Lifestyle",
+        "Checklists",
+    ])
+
+    with tabs[0]:
+        st.subheader("Start Here: How to Use Retirement Blueprint 101")
+        st.write("The app is organized like a guided retirement journey. Start with basic inputs, then go deeper only where needed.")
+        journey = pd.DataFrame([
+            {"Step": "Dashboard", "Purpose": "Quick snapshot", "What to do": "Review your score, income estimate, risks, and next steps."},
+            {"Step": "Phase 1 — Foundation", "Purpose": "Build your base plan", "What to do": "Enter age, retirement age, income, spending, assets, debts, Social Security, and spouse details."},
+            {"Step": "Phase 2 — Retirement Lab", "Purpose": "Test what-if scenarios", "What to do": "Compare retirement ages, return assumptions, spending levels, and two-bucket strategy."},
+            {"Step": "Phase 3 — Income & Tax", "Purpose": "Improve withdrawal efficiency", "What to do": "Review income sources, tax estimate, Roth conversion opportunity, RMD risk, and withdrawal order."},
+            {"Step": "Phase 4 — Lifestyle", "Purpose": "Design retirement life", "What to do": "Compare states, lifestyle priorities, best places to retire, and snowbird options."},
+            {"Step": "Phase 5 — My Plans", "Purpose": "Organize your blueprint", "What to do": "Save plans, compare ideas, track checklist items, and export your plan."},
+        ])
+        st.dataframe(journey, use_container_width=True, hide_index=True)
+
+        st.markdown("### Suggested path")
+        st.markdown("""
+1. Enter your best estimates in Phase 1.  
+2. Use Phase 2 to test retirement ages and return assumptions.  
+3. Use Phase 3 to understand taxes and withdrawal order.  
+4. Use Phase 4 to compare where retirement may work best.  
+5. Save your best plan in Phase 5 and export a report.
+""")
+
+    with tabs[1]:
+        st.subheader("Plain-English Retirement Glossary")
+        glossary = pd.DataFrame([
+            {"Term": "4% Rule", "Plain-English meaning": "A rough guideline that says withdrawing around 4% of a retirement portfolio in the first year may support a long retirement, but it is not a guarantee."},
+            {"Term": "Two-Bucket Strategy", "Plain-English meaning": "Keeping near-term spending money in safer assets and long-term money in growth assets to reduce stress during market downturns."},
+            {"Term": "Roth Conversion", "Plain-English meaning": "Moving money from a traditional retirement account to a Roth account and paying tax now to potentially reduce future taxes."},
+            {"Term": "RMD", "Plain-English meaning": "Required Minimum Distribution. The amount the IRS requires you to withdraw from certain retirement accounts later in life."},
+            {"Term": "Rule of 55", "Plain-English meaning": "A rule that may allow penalty-free withdrawals from a current employer's 401(k) if you leave that employer in or after the year you turn 55."},
+            {"Term": "Sequence Risk", "Plain-English meaning": "The risk that poor market returns early in retirement hurt your portfolio more because you are withdrawing while markets are down."},
+            {"Term": "Taxable Account", "Plain-English meaning": "A brokerage, savings, or investment account that is not tax-sheltered like an IRA or 401(k)."},
+            {"Term": "Traditional IRA/401(k)", "Plain-English meaning": "Retirement money that is usually taxed when withdrawn."},
+            {"Term": "Roth IRA/401(k)", "Plain-English meaning": "Retirement money that may be tax-free when withdrawn if rules are met."},
+            {"Term": "ACA Bridge", "Plain-English meaning": "The period before Medicare where early retirees may need marketplace health insurance and may care about taxable income levels."},
+        ])
+        st.dataframe(glossary, use_container_width=True, hide_index=True)
+        if search:
+            st.info(f"Search noted: '{search}'. Future version can filter these resources automatically.")
+
+    with tabs[2]:
+        st.subheader("Retirement Rules & Concepts")
+        with st.expander("Rule of 55", expanded=True):
+            st.write("The Rule of 55 may help some people who leave an employer in or after the year they turn 55 access that employer's 401(k) without the usual 10% early withdrawal penalty. It does not automatically apply to all accounts, old IRAs, or every plan. Users should verify plan rules before relying on it.")
+        with st.expander("4% Rule"):
+            st.write("The 4% rule is a starting point, not a promise. It does not fully account for taxes, healthcare costs, spending changes, bad early market returns, or personal goals. Use it as a benchmark, then test scenarios in Phase 2.")
+        with st.expander("Social Security Timing"):
+            st.write("Claiming earlier gives income sooner but usually lowers the monthly benefit. Waiting may increase the monthly benefit, but the best choice depends on health, work plans, spouse benefits, taxes, and how long the money needs to last.")
+        with st.expander("RMD Planning"):
+            st.write("RMDs can force taxable withdrawals later in retirement. If a user has a large traditional 401(k)/IRA balance, Phase 3 can help show whether Roth conversions or earlier withdrawals may reduce future pressure.")
+
+    with tabs[3]:
+        st.subheader("Taxes & Withdrawal Planning")
+        tax_table = pd.DataFrame([
+            {"Topic": "Cash / Bucket 1", "Why it matters": "Can cover near-term spending and reduce the need to sell growth assets in a down market."},
+            {"Topic": "Taxable brokerage", "Why it matters": "May offer flexibility; taxes depend on gains, losses, dividends, and holding period."},
+            {"Topic": "Traditional IRA/401(k)", "Why it matters": "Withdrawals are generally taxable and can affect tax brackets, Medicare premiums, and ACA planning."},
+            {"Topic": "Roth IRA/401(k)", "Why it matters": "Often valuable to preserve because qualified withdrawals may be tax-free and can provide flexibility later."},
+            {"Topic": "HSA", "Why it matters": "Can be very tax-efficient for qualified medical expenses if the user has one."},
+        ])
+        st.dataframe(tax_table, use_container_width=True, hide_index=True)
+
+        with st.expander("Common withdrawal-order idea"):
+            st.write("A common approach is to use cash and taxable assets strategically, manage traditional withdrawals to avoid unnecessary tax spikes, consider Roth conversions during lower-income years, and preserve Roth/HSA assets when possible. The right order depends heavily on age, tax bracket, healthcare, account balances, and spouse situation.")
+        with st.expander("Roth conversion reminder"):
+            st.write("A Roth conversion can be useful in low-income years, but it creates taxable income in the year of conversion. That can affect tax brackets, ACA subsidies, Medicare IRMAA, and other planning items.")
+
+    with tabs[4]:
+        st.subheader("Healthcare & Medicare Bridge")
+        st.write("Healthcare is one of the biggest early-retirement planning gaps, especially for people retiring before Medicare eligibility.")
+        healthcare_rows = pd.DataFrame([
+            {"Age range": "Before 65", "Planning issue": "Need health insurance before Medicare; marketplace/ACA costs may depend on income."},
+            {"Age 65+", "Planning issue": "Medicare begins for most people, but premiums, supplements, prescriptions, dental, vision, and long-term care still matter."},
+            {"High income later", "Planning issue": "Higher retirement income may increase Medicare-related costs through IRMAA."},
+            {"Long-term care", "Planning issue": "Not the same as normal healthcare. May require separate planning, insurance, or self-funding."},
+        ])
+        st.dataframe(healthcare_rows, use_container_width=True, hide_index=True)
+        st.warning("Healthcare assumptions can change quickly by state, age, income, employer coverage, and law. Treat app numbers as estimates.")
+
+    with tabs[5]:
+        st.subheader("Lifestyle & Best Places to Retire")
+        st.write("Phase 4 is where users compare retirement life, not just money.")
+        lifestyle_rows = pd.DataFrame([
+            {"Factor": "Taxes", "Why it matters": "State income tax, retirement income treatment, property tax, and sales tax can affect annual spending."},
+            {"Factor": "Healthcare access", "Why it matters": "Hospitals, specialists, Medicare networks, and emergency care become more important with age."},
+            {"Factor": "Housing/insurance", "Why it matters": "Home prices, rent, HOA fees, property insurance, flood/wind/fire risk can change affordability."},
+            {"Factor": "Climate", "Why it matters": "Warm winters may help quality of life, but heat, humidity, hurricanes, wildfire, and water risk matter."},
+            {"Factor": "Recreation", "Why it matters": "Golf, beaches, lakes, trails, restaurants, and community activities affect happiness and engagement."},
+            {"Factor": "Family proximity", "Why it matters": "Being near children, parents, grandkids, or friends can outweigh pure tax savings."},
+        ])
+        st.dataframe(lifestyle_rows, use_container_width=True, hide_index=True)
+
+    with tabs[6]:
+        st.subheader("Retirement Checklists")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("#### 2–5 Years Before Retirement")
+            st.checkbox("Estimate true monthly retirement spending", key="res_check_1")
+            st.checkbox("Review Social Security claiming options", key="res_check_2")
+            st.checkbox("Build or review Bucket 1 cash/safe assets", key="res_check_3")
+            st.checkbox("Estimate healthcare bridge costs", key="res_check_4")
+            st.checkbox("Review Roth conversion window", key="res_check_5")
+        with col2:
+            st.markdown("#### 0–12 Months Before Retirement")
+            st.checkbox("Confirm insurance coverage", key="res_check_6")
+            st.checkbox("Confirm withdrawal order", key="res_check_7")
+            st.checkbox("Update estate documents", key="res_check_8")
+            st.checkbox("Create first-year retirement budget", key="res_check_9")
+            st.checkbox("Review plan with tax/financial professional", key="res_check_10")
+
+        st.markdown("### Questions to ask a professional")
+        st.markdown("""
+- Am I eligible for the Rule of 55 with my current employer plan?  
+- Should I use Roth conversions before RMD age?  
+- How will my Social Security be taxed?  
+- What withdrawal order makes sense for my account mix?  
+- What healthcare strategy should I use before Medicare?  
+- How would my plan change if one spouse passes first?  
+""")
+
 def placeholder(title):
     st.title(title)
     st.info("This phase is coming next. The goal is to build one stable phase at a time.")
@@ -1899,5 +2047,7 @@ elif nav == "Reports":
     show_reports()
 elif nav == "AI Coach":
     show_ai_coach()
+elif nav == "Resources":
+    show_resources()
 else:
     placeholder("Resources")
