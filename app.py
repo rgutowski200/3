@@ -203,6 +203,8 @@ with st.sidebar:
     else:
         st.info("Free dashboard mode")
 
+    st.caption("Build: Phase 2 v2 — fixed comparison defaults")
+
     st.markdown("### Quick Assumptions")
     st.text_input("Plan name", key="plan_name")
     st.number_input("Your age", min_value=45, max_value=90, key="sidebar_age", value=st.session_state.phase1_age)
@@ -515,10 +517,16 @@ def show_phase2():
 
     c1, c2, c3 = st.columns(3)
     with c1:
+        retirement_age_options = list(range(55, 71))
+        default_compare_ages = []
+        for age in [int(st.session_state.phase1_retire_age), 62, 65, 67]:
+            if age in retirement_age_options and age not in default_compare_ages:
+                default_compare_ages.append(age)
+
         compare_ages = st.multiselect(
             "Retirement ages to compare",
-            options=list(range(55, 71)),
-            default=[st.session_state.phase1_retire_age, 62, 65, 67],
+            options=retirement_age_options,
+            default=default_compare_ages,
             key="phase2_compare_ages",
         )
     with c2:
