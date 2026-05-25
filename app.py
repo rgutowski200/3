@@ -10,7 +10,7 @@ st.set_page_config(
 # ----------------------------
 
 defaults = {
-    "name": "John",
+    "name": "RG Financial",
     "age": 55,
     "retire_age": 58,
     "plan_age": 90,
