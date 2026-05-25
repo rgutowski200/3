@@ -443,6 +443,7 @@ with st.sidebar:
     st.number_input("Your age", min_value=45, max_value=90, key="sidebar_age", step=1, on_change=sync_from_sidebar, help="Your current age today. This drives retirement timing, growth years, Social Security timing, and Medicare bridge years.")
     st.slider("Target retirement age", 50, 75, key="sidebar_retire_age", on_change=sync_from_sidebar, help="The age you hope to stop full-time work and begin relying on retirement income.")
     st.number_input("Estimated monthly spend", min_value=0, step=500, key="sidebar_monthly_spending", on_change=sync_from_sidebar, help="Your estimated average monthly retirement spending. Use a quick estimate here; Phase 1 has a detailed budget builder.")
+    st.caption("Build: Auto-save inputs v1")
     st.caption(f"Build: {BUILD_LABEL}")
 
 # ------------------------------------------------------------
@@ -529,8 +530,8 @@ def show_phase1():
         st.subheader("Household Basics")
         c1, c2, c3 = st.columns(3)
         c1.text_input("First name", key="name", help="Used only to personalize the dashboard greeting and report language.")
-        c2.number_input("Current age", min_value=45, max_value=90, key="phase1_age", value=int(st.session_state.age), help="Your current age today. The app uses this to calculate how many years you have until retirement and how long the plan must last.")
-        c3.slider("Retirement age", 50, 75, key="phase1_retire_age", value=int(st.session_state.retire_age), help="The age you want to test for retirement. You can compare multiple ages later in Phase 2.")
+        c2.number_input("Current age", min_value=45, max_value=90, key="phase1_age", value=int(st.session_state.age), on_change=apply_household_updates, help="Your current age today. The app uses this to calculate how many years you have until retirement and how long the plan must last. This auto-saves during your session.")
+        c3.slider("Retirement age", 50, 75, key="phase1_retire_age", value=int(st.session_state.retire_age), on_change=apply_household_updates, help="The age you want to test for retirement. You can compare multiple ages later in Phase 2. This auto-saves during your session.")
         c4, c5 = st.columns(2)
         c4.slider("Plan through age", 75, 100, key="plan_age", help="The age the projection should run through. Many retirement plans use age 90 or 95 to test longevity risk.")
         planning_depth = c5.selectbox("Planning depth", ["Simple", "Standard", "Advanced"], index=1, help="Choose how detailed the planning should be. Simple is quick, Standard adds major assumptions, and Advanced includes tax and strategy details.")
@@ -555,7 +556,8 @@ def show_phase1():
             step=500,
             key="phase1_monthly_spending",
             value=int(st.session_state.monthly_spending),
-            help="Your estimated average monthly spending in retirement. Include normal living costs, travel, insurance, healthcare, hobbies, and recurring bills.",
+            on_change=apply_spending_updates,
+            help="Your estimated average monthly spending in retirement. Include normal living costs, travel, insurance, healthcare, hobbies, and recurring bills. This auto-saves during your session.",
         )
         if st.button("Apply spending update"):
             st.session_state.monthly_spending = st.session_state.phase1_monthly_spending
@@ -634,7 +636,7 @@ def show_phase1():
     c2.metric("Guaranteed Income", money(guaranteed_income()))
     c3.metric("Portfolio", money(portfolio_total()))
     c4.metric("Home Equity", money(st.session_state.home_equity))
-    st.success("Inputs are automatically saved during this session.")
+    st.success("Inputs are automatically saved during this browser session. Use Phase 5 to save/export a named plan you want to keep after refresh or redeploy.")
 
 
 def phase2_table(compare_ages, return_scenario):
