@@ -405,8 +405,8 @@ def readiness_meter(score):
         title={"text": "", "font": {"size": 14}},
     ))
     fig.update_layout(
-        height=230,
-        margin=dict(l=20, r=20, t=15, b=10),
+        height=205,
+        margin=dict(l=10, r=10, t=5, b=5),
         paper_bgcolor="rgba(0,0,0,0)",
         font={"color": "#111827"},
     )
@@ -501,12 +501,12 @@ def show_dashboard():
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-        st.markdown("<div class='metric-label'>Retirement Readiness Score</div>", unsafe_allow_html=True)
-        st.plotly_chart(readiness_meter(score), use_container_width=True, config={"displayModeBar": False})
-        st.markdown(f"<div class='green'>{confidence}</div>", unsafe_allow_html=True)
-        st.markdown("<div class='metric-note'>Based on income coverage, portfolio strength, spending, and retirement timing.</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        # Use a real Streamlit bordered container so the gauge stays inside the same card.
+        with st.container(border=True):
+            st.markdown("<div class='metric-label'>Retirement Readiness Score</div>", unsafe_allow_html=True)
+            st.plotly_chart(readiness_meter(score), use_container_width=True, config={"displayModeBar": False})
+            st.markdown(f"<div class='green'>{confidence}</div>", unsafe_allow_html=True)
+            st.markdown("<div class='metric-note'>Based on income coverage, portfolio strength, spending, and retirement timing.</div>", unsafe_allow_html=True)
     with c2:
         st.markdown(f"""
         <div class='metric-card'>
