@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 2 Return Projection v1"
+BUILD_LABEL = "Clean Phase 5 Local Save Import v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -119,6 +119,72 @@ def init_state():
 init_state()
 if "saved_plans" not in st.session_state:
     st.session_state.saved_plans = []
+
+# Keys included when saving/exporting/loading a local plan.
+PLAN_INPUT_KEYS = [
+    "plan_name", "name", "age", "retire_age", "plan_age",
+    "current_income", "monthly_spending", "other_income", "pension_income",
+    "social_security", "ss_start_age", "portfolio", "traditional", "roth",
+    "taxable_cash", "home_equity", "home_value", "mortgage",
+    "healthcare_monthly", "inflation", "growth_return", "safe_return",
+    "tax_rate", "roth_conversion", "aca_target_income",
+    "spouse_enabled", "spouse_age", "spouse_income", "spouse_ss", "spouse_ss_start_age",
+    "phase2_compare_ages", "sidebar_age", "sidebar_retire_age", "sidebar_monthly_spending",
+    "p5_plan_name", "p5_tags", "p5_notes",
+]
+
+
+def capture_plan_inputs():
+    return {k: st.session_state.get(k) for k in PLAN_INPUT_KEYS if k in st.session_state}
+
+
+def apply_plan_inputs(inputs):
+    if not isinstance(inputs, dict):
+        return
+    for k, v in inputs.items():
+        if k in PLAN_INPUT_KEYS:
+            st.session_state[k] = v
+    if "age" in inputs:
+        st.session_state["sidebar_age"] = inputs.get("age")
+    if "retire_age" in inputs:
+        st.session_state["sidebar_retire_age"] = inputs.get("retire_age")
+    if "monthly_spending" in inputs:
+        st.session_state["sidebar_monthly_spending"] = inputs.get("monthly_spending")
+
+
+def load_saved_plan(index):
+    plan = st.session_state.saved_plans[index]
+    inputs = plan.get("inputs", {})
+    if inputs:
+        apply_plan_inputs(inputs)
+    else:
+        # Backward-compatible fallback for older in-session saved plans.
+        st.session_state["retire_age"] = int(plan.get("retirement_age", st.session_state.retire_age))
+        st.session_state["plan_age"] = int(plan.get("planning_horizon", st.session_state.plan_age))
+        st.session_state["monthly_spending"] = float(plan.get("annual_spending", annual_spending())) / 12
+        st.session_state["portfolio"] = float(plan.get("portfolio", st.session_state.portfolio))
+        st.session_state["home_equity"] = float(plan.get("home_equity", st.session_state.home_equity))
+    st.session_state["last_loaded_plan"] = plan.get("plan_name", "Saved Plan")
+
+
+def delete_saved_plan(index):
+    if 0 <= index < len(st.session_state.saved_plans):
+        st.session_state.saved_plans.pop(index)
+
+
+def import_plan_payload(payload):
+    if isinstance(payload, dict) and "saved_plans" in payload:
+        imported = payload.get("saved_plans", [])
+        if isinstance(imported, list):
+            st.session_state.saved_plans.extend(imported)
+            st.session_state["last_import_status"] = f"Imported {len(imported)} saved plan(s)."
+    elif isinstance(payload, dict):
+        st.session_state.saved_plans.append(payload)
+        if payload.get("inputs"):
+            apply_plan_inputs(payload["inputs"])
+        st.session_state["last_import_status"] = "Imported 1 plan."
+    else:
+        st.session_state["last_import_status"] = "Import failed: unsupported file format."
 
 # ------------------------------------------------------------
 # Data helpers
@@ -817,6 +883,7 @@ def current_plan_snapshot():
         "notes": st.session_state.get("p5_notes", ""),
         "tags": st.session_state.get("p5_tags", []),
         "recommendations": build_recommendations(),
+        "inputs": capture_plan_inputs(),
     }
 
 
@@ -876,24 +943,51 @@ def show_phase5():
     st.progress(completed / len(checks), text=f"Blueprint completion checklist: {completed} of {len(checks)} completed")
 
     st.divider()
-    st.subheader("Save This Blueprint")
+    st.subheader("Save, Load, Export, and Import")
+    st.markdown("<div class='soft-box'>This is still local saving only. Plans stay available while the browser session is active. Export a plan file if you want to keep it and import it later.</div>", unsafe_allow_html=True)
+
     c1, c2, c3 = st.columns([1, 1, 1])
-    if c1.button("Save current plan", use_container_width=True):
+    if c1.button("Save current plan", use_container_width=True, help="Saves the current inputs and assumptions into this browser session."):
         snap = current_plan_snapshot()
         st.session_state.saved_plans.append(snap)
         st.success(f"Saved: {snap['plan_name']}")
-    if c2.button("Clear saved plans", use_container_width=True):
+    if c2.button("Clear saved plans", use_container_width=True, help="Clears all locally saved plans from this browser session."):
         st.session_state.saved_plans = []
         st.warning("Saved plans cleared for this session.")
 
     snapshot = current_plan_snapshot()
     c3.download_button(
-        "Download plan JSON",
+        "Export current plan",
         data=json.dumps(snapshot, indent=2),
         file_name=f"{snapshot['plan_name'].replace(' ', '_').lower()}_retirement_blueprint.json",
         mime="application/json",
         use_container_width=True,
+        help="Downloads the current plan as a JSON file you can import later.",
     )
+
+    if st.session_state.get("last_loaded_plan"):
+        st.success(f"Loaded plan: {st.session_state.last_loaded_plan}")
+    if st.session_state.get("last_import_status"):
+        st.info(st.session_state.last_import_status)
+
+    st.subheader("Import a Plan File")
+    upload = st.file_uploader(
+        "Upload exported retirement blueprint JSON",
+        type=["json"],
+        help="Use this to bring back a plan you previously exported from this app.",
+    )
+    if upload is not None:
+        try:
+            payload = json.loads(upload.getvalue().decode("utf-8"))
+            st.button(
+                "Import plan file",
+                use_container_width=True,
+                on_click=import_plan_payload,
+                args=(payload,),
+                help="Adds the uploaded plan to your local saved plans and loads its inputs when available.",
+            )
+        except Exception as e:
+            st.error(f"Could not read this JSON file: {e}")
 
     st.subheader("Saved Plans This Session")
     if not st.session_state.saved_plans:
@@ -903,24 +997,72 @@ def show_phase5():
         for idx, plan in enumerate(st.session_state.saved_plans, start=1):
             rows.append({
                 "#": idx,
-                "Plan": plan["plan_name"],
-                "Saved": plan["saved_at"],
-                "Retire Age": plan["retirement_age"],
-                "Score": plan["readiness_score"],
-                "Confidence": plan["confidence"],
-                "Annual Spending": money(plan["annual_spending"]),
-                "Portfolio": money(plan["portfolio"]),
-                "Withdrawal Rate": f"{plan['withdrawal_rate']:.1f}%",
+                "Plan": plan.get("plan_name", "Saved Plan"),
+                "Saved": plan.get("saved_at", ""),
+                "Retire Age": plan.get("retirement_age", ""),
+                "Score": plan.get("readiness_score", ""),
+                "Confidence": plan.get("confidence", ""),
+                "Annual Spending": money(plan.get("annual_spending", 0)),
+                "Portfolio": money(plan.get("portfolio", 0)),
+                "Withdrawal Rate": f"{float(plan.get('withdrawal_rate', 0)):.1f}%",
                 "Tags": ", ".join(plan.get("tags", [])),
             })
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-        selected_idx = st.selectbox("Review saved plan detail", list(range(1, len(st.session_state.saved_plans) + 1)), format_func=lambda i: st.session_state.saved_plans[i-1]["plan_name"], help="Choose a saved plan from this browser session to review its details and notes.")
-        selected_plan = st.session_state.saved_plans[selected_idx - 1]
-        st.markdown(f"<div class='success-box'><b>{selected_plan['plan_name']}</b><br>Saved {selected_plan['saved_at']} • Confidence: {selected_plan['confidence']} • Readiness Score: {selected_plan['readiness_score']}/100</div>", unsafe_allow_html=True)
-        with st.expander("View plan notes and recommendations"):
-            st.write(selected_plan.get("notes") or "No notes added.")
-            for rec in selected_plan.get("recommendations", []):
-                st.write(f"• {rec}")
+
+        st.markdown("### Plan Manager")
+        for idx, plan in enumerate(st.session_state.saved_plans):
+            with st.container(border=True):
+                top = st.columns([2, 1, 1, 1])
+                top[0].markdown(f"**{plan.get('plan_name', 'Saved Plan')}**  \n<span class='small-muted'>Saved {plan.get('saved_at', '')} • {plan.get('confidence', '')} • Score {plan.get('readiness_score', '')}/100</span>", unsafe_allow_html=True)
+                top[1].metric("Retire", f"Age {plan.get('retirement_age', '')}")
+                top[2].metric("Spend", money(plan.get("annual_spending", 0)))
+                top[3].metric("Portfolio", money(plan.get("portfolio", 0)))
+
+                b1, b2, b3 = st.columns([1, 1, 1])
+                b1.button(
+                    "Load plan",
+                    key=f"load_plan_{idx}",
+                    use_container_width=True,
+                    on_click=load_saved_plan,
+                    args=(idx,),
+                    help="Loads this saved plan's inputs back into the app.",
+                )
+                b2.download_button(
+                    "Export",
+                    data=json.dumps(plan, indent=2),
+                    file_name=f"{plan.get('plan_name', 'saved_plan').replace(' ', '_').lower()}_retirement_blueprint.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key=f"export_plan_{idx}",
+                    help="Downloads only this saved plan.",
+                )
+                b3.button(
+                    "Delete",
+                    key=f"delete_plan_{idx}",
+                    use_container_width=True,
+                    on_click=delete_saved_plan,
+                    args=(idx,),
+                    help="Deletes this saved plan from the current session.",
+                )
+
+                with st.expander("View notes and recommendations"):
+                    st.write(plan.get("notes") or "No notes added.")
+                    for rec in plan.get("recommendations", []):
+                        st.write(f"• {rec}")
+
+        all_payload = {
+            "exported_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "app": "Retirement Blueprint 101",
+            "saved_plans": st.session_state.saved_plans,
+        }
+        st.download_button(
+            "Export all saved plans",
+            data=json.dumps(all_payload, indent=2),
+            file_name="retirement_blueprint_all_saved_plans.json",
+            mime="application/json",
+            use_container_width=True,
+            help="Downloads every plan saved in this browser session.",
+        )
 
 
 def build_report_html():
