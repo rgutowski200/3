@@ -323,7 +323,16 @@ def show_phase1():
 
     with tabs[2]:
         st.subheader("Spending")
-        st.number_input("Estimated monthly retirement spending", min_value=0, step=500, key="monthly_spending")
+        st.number_input(
+            "Estimated monthly retirement spending",
+            min_value=0,
+            step=500,
+            key="phase1_monthly_spending",
+            value=int(st.session_state.monthly_spending),
+        )
+        if st.button("Apply spending update"):
+            st.session_state.monthly_spending = st.session_state.phase1_monthly_spending
+            st.success(f"Monthly spending updated to {money(st.session_state.monthly_spending)}.")
         with st.expander("Detailed monthly budget"):
             cats = ["Housing", "Utilities", "Food", "Healthcare", "Travel", "Insurance", "Vehicles", "Entertainment", "Family support", "Other"]
             cols = st.columns(2)
