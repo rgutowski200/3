@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 + Two Bucket Strategy v1"
+BUILD_LABEL = "Clean Phase 5 + Two Bucket + Withdrawal Optimizer v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -92,6 +92,11 @@ def init_state():
         "traditional": 680000,
         "roth": 110000,
         "taxable_cash": 60000,
+        "hsa_balance": 0,
+        "rule55_eligible": True,
+        "aca_sensitive": True,
+        "rmd_concern": "Medium",
+        "market_downturn": False,
         "bucket1_balance": 450000,
         "bucket2_balance": 400000,
         "bucket1_return": 4.5,
@@ -130,7 +135,7 @@ PLAN_INPUT_KEYS = [
     "plan_name", "name", "age", "retire_age", "plan_age",
     "current_income", "monthly_spending", "other_income", "pension_income",
     "social_security", "ss_start_age", "portfolio", "traditional", "roth",
-    "taxable_cash", "bucket1_balance", "bucket2_balance", "bucket1_return",
+    "taxable_cash", "hsa_balance", "rule55_eligible", "aca_sensitive", "rmd_concern", "market_downturn", "bucket1_balance", "bucket2_balance", "bucket1_return",
     "bucket2_return", "bucket1_years", "home_equity", "home_value", "mortgage",
     "healthcare_monthly", "inflation", "growth_return", "safe_return",
     "tax_rate", "roth_conversion", "aca_target_income",
@@ -792,11 +797,80 @@ def show_phase2():
     )
 
 
+def withdrawal_strategy_rules(age, retire_age, ss_start_age, traditional, roth, taxable_cash, hsa_balance, bucket1_balance, spending, guaranteed, tax_rate, aca_target, roth_conversion, rule55_eligible, aca_sensitive, rmd_concern, market_downturn):
+    """Simple educational rule engine for tax-smart withdrawal order."""
+    withdrawal_need = max(0, spending - guaranteed)
+    taxable_income_est = guaranteed + withdrawal_need + roth_conversion
+    pre_595 = age < 59.5
+    pre_medicare = age < 65
+    pre_ss = age < ss_start_age
+    rmd_pressure = traditional > 600000 or rmd_concern in ["High", "Very High"]
+
+    order = []
+    reasons = []
+    warnings = []
+    opportunities = []
+
+    if market_downturn and bucket1_balance > 0:
+        order.append(("1", "Bucket 1 / cash reserve", "Use safer assets first during downturns to avoid selling growth investments when they may be temporarily down."))
+        warnings.append("Market downturn mode is on. Preserving Bucket 2 growth assets may reduce sequence-of-return damage.")
+    elif bucket1_balance > 0:
+        order.append(("1", "Bucket 1 / cash reserve", "Use near-term cash/safe assets for planned spending and market-crash protection."))
+
+    if pre_595:
+        if rule55_eligible and traditional > 0:
+            order.append(("2", "Current employer 401(k) / Rule of 55, if eligible", "If you separate from service in or after the year you turn 55, some 401(k) withdrawals may avoid the 10% early-withdrawal penalty."))
+            reasons.append("Because you are under 59½, early-withdrawal penalty rules matter.")
+        if taxable_cash > 0:
+            order.append(("3", "Taxable savings / brokerage", "Taxable assets can provide flexibility before 59½ and can help manage income before Medicare."))
+    else:
+        if taxable_cash > 0:
+            order.append(("2", "Taxable savings / brokerage", "Use taxable assets strategically for flexibility while managing capital gains and tax brackets."))
+        if traditional > 0:
+            order.append(("3", "Traditional IRA / 401(k)", "Withdraw enough to fill attractive tax brackets, especially before RMDs begin."))
+
+    if pre_medicare and aca_sensitive:
+        warnings.append("You are before Medicare age. Large traditional withdrawals or Roth conversions may raise MAGI and affect ACA subsidy eligibility.")
+        if taxable_income_est > aca_target and aca_target > 0:
+            warnings.append(f"Modeled taxable income of {money(taxable_income_est)} is above your ACA target of {money(aca_target)}.")
+        else:
+            opportunities.append("Income appears near/below the ACA target, which may preserve healthcare subsidy flexibility.")
+
+    if roth_conversion > 0:
+        opportunities.append(f"Testing {money(roth_conversion)} in Roth conversions may reduce future RMD pressure, but it raises current taxable income.")
+    elif (pre_ss or pre_medicare) and traditional > 0 and tax_rate <= 22:
+        opportunities.append("Low-income gap years before Social Security/Medicare can be a useful window to test Roth conversions.")
+
+    if rmd_pressure:
+        opportunities.append("Traditional account balance is large enough to create possible RMD pressure later. Consider bracket-filling Roth conversions or controlled withdrawals before RMD age.")
+
+    if roth > 0:
+        order.append(("Later", "Roth IRA / Roth 401(k)", "Usually preserve Roth money as long as possible because qualified withdrawals are tax-free and flexible."))
+    if hsa_balance > 0:
+        order.append(("Last / medical", "HSA", "If eligible, preserve HSA dollars for qualified healthcare expenses because they can be triple-tax advantaged."))
+
+    # Deduplicate by account label while preserving order.
+    seen = set()
+    unique = []
+    for row in order:
+        if row[1] not in seen:
+            unique.append(row)
+            seen.add(row[1])
+
+    if not warnings:
+        warnings.append("No major red flags based on the simplified inputs, but tax rules should be reviewed before acting.")
+    if not opportunities:
+        opportunities.append("The biggest opportunity is to coordinate spending, tax brackets, healthcare income limits, and RMD timing.")
+
+    return unique, warnings, opportunities, withdrawal_need, taxable_income_est
+
+
 def show_phase3():
     st.title("Phase 3 — Income & Tax")
-    st.write("Estimate retirement income sources, portfolio withdrawal need, tax pressure, Roth conversion impact, and future RMD risk.")
+    st.write("Estimate retirement income sources, portfolio withdrawal need, tax pressure, Roth conversion impact, future RMD risk, and a tax-smart account drawdown order.")
     st.markdown("<div class='soft-box'>This is a planning estimate, not tax advice. The goal is to show pressure points and help users know what to ask a financial or tax professional.</div>", unsafe_allow_html=True)
 
+    st.subheader("Income & tax assumptions")
     c1, c2, c3 = st.columns(3)
     c1.number_input("Estimated effective tax rate (%)", min_value=0.0, max_value=40.0, step=0.5, key="tax_rate", help="Estimated average tax rate on retirement income. This is not a tax filing calculation, just a planning assumption.")
     c2.number_input("Annual Roth conversion to test", min_value=0, step=5000, key="roth_conversion", help="Amount of traditional IRA/401(k) money to model converting into Roth each year. This may raise taxes now but reduce future RMD pressure.")
@@ -826,6 +900,61 @@ def show_phase3():
     fig.update_layout(height=340, title="Retirement Income Mix")
     st.plotly_chart(fig, use_container_width=True)
 
+    st.divider()
+    st.subheader("Tax-Smart Withdrawal Order Optimizer")
+    st.write("This module recommends which account types to consider drawing from first based on age, taxes, healthcare sensitivity, RMD pressure, and your bucket strategy.")
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.number_input("Taxable / cash balance", min_value=0, step=10000, key="taxable_cash", help="Money in savings, money market, CDs, taxable brokerage, or other non-retirement accounts available for flexible withdrawals.")
+    c2.number_input("Traditional IRA / 401(k)", min_value=0, step=10000, key="traditional", help="Pre-tax retirement accounts. Withdrawals are generally taxable and may create RMDs later.")
+    c3.number_input("Roth IRA / Roth 401(k)", min_value=0, step=10000, key="roth", help="After-tax retirement accounts. Qualified withdrawals are generally tax-free and can provide tax flexibility.")
+    c4.number_input("HSA balance", min_value=0, step=1000, key="hsa_balance", help="Health Savings Account balance. Often best preserved for qualified medical expenses because of tax advantages.")
+
+    c5, c6, c7, c8 = st.columns(4)
+    c5.checkbox("Rule of 55 may apply", key="rule55_eligible", help="Check this if you may leave your employer in or after the year you turn 55 and want the app to consider 401(k) access before 59½.")
+    c6.checkbox("ACA subsidy sensitive", key="aca_sensitive", help="Check this if you may retire before Medicare and want to control taxable income for healthcare subsidy planning.")
+    c7.selectbox("RMD concern level", ["Low", "Medium", "High", "Very High"], key="rmd_concern", help="How concerned you are about large taxable Required Minimum Distributions later in retirement.")
+    c8.checkbox("Market downturn mode", key="market_downturn", help="Check this to prioritize using Bucket 1/cash before selling growth assets during a bad market.")
+
+    order, warnings, opportunities, need, taxable_income_est = withdrawal_strategy_rules(
+        age=st.session_state.age,
+        retire_age=st.session_state.retire_age,
+        ss_start_age=st.session_state.ss_start_age,
+        traditional=st.session_state.traditional,
+        roth=st.session_state.roth,
+        taxable_cash=st.session_state.taxable_cash,
+        hsa_balance=st.session_state.hsa_balance,
+        bucket1_balance=st.session_state.bucket1_balance,
+        spending=spending,
+        guaranteed=gross_income,
+        tax_rate=st.session_state.tax_rate,
+        aca_target=st.session_state.aca_target_income,
+        roth_conversion=st.session_state.roth_conversion,
+        rule55_eligible=st.session_state.rule55_eligible,
+        aca_sensitive=st.session_state.aca_sensitive,
+        rmd_concern=st.session_state.rmd_concern,
+        market_downturn=st.session_state.market_downturn,
+    )
+
+    st.markdown("### Recommended drawdown order")
+    order_df = pd.DataFrame(order, columns=["Priority", "Account / Strategy", "Why it may fit"])
+    st.dataframe(order_df, use_container_width=True, hide_index=True)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Modeled Withdrawal Need", money(need))
+    c2.metric("Modeled Taxable Income", money(taxable_income_est))
+    c3.metric("Traditional Balance", money(st.session_state.traditional))
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("### Watch-outs")
+        for item in warnings:
+            st.warning(item)
+    with right:
+        st.markdown("### Tax-saving opportunities")
+        for item in opportunities:
+            st.success(item)
+
     if st.session_state.roth_conversion > 0:
         st.info(f"Testing a {money(st.session_state.roth_conversion)} annual Roth conversion increases near-term taxable income, but may reduce future RMD pressure if repeated strategically.")
     if gross_income + withdrawal_need > st.session_state.aca_target_income:
@@ -833,7 +962,7 @@ def show_phase3():
     else:
         st.success("Your modeled income is near or below the ACA target. That may help preserve healthcare subsidy flexibility before Medicare.")
 
-    st.markdown(f"<div class='success-box'><b>Plain-English takeaway:</b> Your current spending creates an estimated portfolio withdrawal need of <b>{money(withdrawal_need)}</b> per year. The key tax planning question is whether Roth conversions now can reduce RMD and survivor-tax pressure later.</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='success-box'><b>Plain-English takeaway:</b> Your current spending creates an estimated portfolio withdrawal need of <b>{money(withdrawal_need)}</b> per year. A tax-smart order can help coordinate Bucket 1 cash, taxable assets, traditional withdrawals, Roth conversions, and Roth/HSA preservation. The key planning question is whether to use low-income years to reduce future taxable balances without disrupting healthcare subsidies or pushing income into higher brackets.</div>", unsafe_allow_html=True)
 
 
 # -------------------- Phase 4 Lifestyle Data --------------------
