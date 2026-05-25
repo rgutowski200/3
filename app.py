@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 + Tax Estimator + AI Coach + Resources + SS Claiming Adjustment v1"
+BUILD_LABEL = "Readiness Meter v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -377,6 +377,41 @@ def project_portfolio(retire_age=None, return_rate=None, plan_age=None):
     return pd.DataFrame(rows)
 
 
+
+def readiness_meter(score):
+    """Return a Plotly gauge for the dashboard readiness score."""
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=int(score),
+        number={"suffix": "/100", "font": {"size": 34}},
+        gauge={
+            "axis": {"range": [0, 100], "tickwidth": 1, "tickcolor": "#94a3b8"},
+            "bar": {"color": "#159947"},
+            "bgcolor": "white",
+            "borderwidth": 1,
+            "bordercolor": "#e5e7eb",
+            "steps": [
+                {"range": [0, 40], "color": "#fee2e2"},
+                {"range": [40, 60], "color": "#ffedd5"},
+                {"range": [60, 80], "color": "#fef9c3"},
+                {"range": [80, 100], "color": "#dcfce7"},
+            ],
+            "threshold": {
+                "line": {"color": "#111827", "width": 3},
+                "thickness": 0.75,
+                "value": int(score),
+            },
+        },
+        title={"text": "", "font": {"size": 14}},
+    ))
+    fig.update_layout(
+        height=230,
+        margin=dict(l=20, r=20, t=15, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        font={"color": "#111827"},
+    )
+    return fig
+
 def dashboard_chart():
     df = project_portfolio()
     fig = go.Figure()
@@ -466,14 +501,12 @@ def show_dashboard():
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.markdown(f"""
-        <div class='metric-card'>
-            <div class='metric-label'>Retirement Readiness Score</div>
-            <div class='metric-value'>{score}<span style='font-size:1rem;'>/100</span></div>
-            <div class='green'>{confidence}</div>
-            <div class='metric-note'>Based on income coverage, portfolio strength, spending, and retirement timing.</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+        st.markdown("<div class='metric-label'>Retirement Readiness Score</div>", unsafe_allow_html=True)
+        st.plotly_chart(readiness_meter(score), use_container_width=True, config={"displayModeBar": False})
+        st.markdown(f"<div class='green'>{confidence}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='metric-note'>Based on income coverage, portfolio strength, spending, and retirement timing.</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
     with c2:
         st.markdown(f"""
         <div class='metric-card'>
