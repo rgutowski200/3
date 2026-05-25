@@ -573,35 +573,29 @@ def show_phase1():
 
     with tabs[3]:
         st.subheader("Social Security")
-        c1, c2, c3 = st.columns(3)
+        st.session_state.ss_fra_age = 67
+        c1, c2 = st.columns(2)
         c1.number_input(
             "Your annual Social Security at full retirement age",
             min_value=0,
             step=1000,
             key="social_security",
-            help="Enter your estimated annual benefit at full retirement age from SSA.gov. The app will adjust it up or down when you change the claiming age."
+            help="Enter your estimated annual benefit at full retirement age from SSA.gov. The app assumes full retirement age is 67 and adjusts the estimate up or down based on the claiming age you choose."
         )
         c2.slider(
             "Your Social Security start age",
             62,
             70,
             key="ss_start_age",
-            help="Choose when you plan to claim. Filing before full retirement age reduces benefits; delaying after full retirement age increases benefits until age 70."
+            help="Choose when you plan to claim. Filing before age 67 reduces benefits; delaying after age 67 increases benefits until age 70."
         )
-        c3.slider(
-            "Your full retirement age",
-            66,
-            67,
-            key="ss_fra_age",
-            help="Most people born in 1960 or later have a full retirement age of 67. Use 66 if that better matches your SSA estimate."
-        )
-        user_ss_factor = ss_claiming_factor(st.session_state.ss_start_age, st.session_state.ss_fra_age)
+        user_ss_factor = ss_claiming_factor(st.session_state.ss_start_age, 67)
         st.info(
             f"Estimated Social Security at claiming age {st.session_state.ss_start_age}: "
             f"{money(adjusted_user_social_security())} per year "
-            f"({user_ss_factor * 100:.0f}% of the full-retirement-age estimate)."
+            f"({user_ss_factor * 100:.0f}% of the age-67 estimate)."
         )
-        st.caption("This is a simplified estimate. SSA calculates benefits by month and individual birth year, so users should confirm exact numbers at SSA.gov.")
+        st.caption("This is a simplified estimate using age 67 as full retirement age. SSA calculates benefits by month and individual birth year, so users should confirm exact numbers at SSA.gov.")
 
     with tabs[4]:
         st.subheader("Assets & Debt")
@@ -622,14 +616,13 @@ def show_phase1():
             c1.number_input("Spouse age", min_value=45, max_value=90, key="spouse_age", help="Your spouse or partner’s current age. This affects retirement timing, Social Security timing, and survivor planning.")
             c2.number_input("Spouse annual income", min_value=0, step=5000, key="spouse_income", help="Your spouse or partner’s current annual earned income before taxes.")
             c3.number_input("Spouse annual Social Security at full retirement age", min_value=0, step=1000, key="spouse_ss", help="Estimated annual Social Security benefit for your spouse or partner at full retirement age. The app adjusts this based on claiming age.")
-            sc1, sc2 = st.columns(2)
-            sc1.slider("Spouse Social Security start age", 62, 70, key="spouse_ss_start_age", help="The age your spouse or partner expects to claim Social Security.")
-            sc2.slider("Spouse full retirement age", 66, 67, key="spouse_ss_fra_age", help="Most people born in 1960 or later have a full retirement age of 67. Use 66 if that better matches the estimate.")
-            spouse_factor = ss_claiming_factor(st.session_state.spouse_ss_start_age, st.session_state.spouse_ss_fra_age)
+            st.session_state.spouse_ss_fra_age = 67
+            st.slider("Spouse Social Security start age", 62, 70, key="spouse_ss_start_age", help="The age your spouse or partner expects to claim Social Security. The app assumes full retirement age is 67.")
+            spouse_factor = ss_claiming_factor(st.session_state.spouse_ss_start_age, 67)
             st.info(
                 f"Estimated spouse Social Security at claiming age {st.session_state.spouse_ss_start_age}: "
                 f"{money(adjusted_spouse_social_security())} per year "
-                f"({spouse_factor * 100:.0f}% of the full-retirement-age estimate)."
+                f"({spouse_factor * 100:.0f}% of the age-67 estimate)."
             )
         else:
             st.info("No spouse or partner is included in this plan.")
