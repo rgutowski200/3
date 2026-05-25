@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 My Plans v1"
+BUILD_LABEL = "Clean Reports v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -791,6 +791,99 @@ def show_phase5():
             for rec in selected_plan.get("recommendations", []):
                 st.write(f"• {rec}")
 
+
+def build_report_html():
+    snapshot = current_plan_snapshot()
+    rec_items = "".join(f"<li>{r}</li>" for r in snapshot.get("recommendations", []))
+    spouse_text = "Yes" if snapshot.get("spouse_included") else "No"
+    return f"""
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Retirement Blueprint 101 Report</title>
+<style>
+body {{ font-family: Arial, sans-serif; color:#111827; margin:40px; line-height:1.45; }}
+h1 {{ color:#061A3A; }}
+h2 {{ color:#061A3A; margin-top:28px; }}
+.card {{ border:1px solid #e5e7eb; border-radius:14px; padding:18px; margin:14px 0; }}
+.grid {{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:14px; }}
+.metric {{ font-size:28px; font-weight:800; }}
+.muted {{ color:#64748b; }}
+</style>
+</head>
+<body>
+<h1>Retirement Blueprint 101 Report</h1>
+<p class="muted">Generated {snapshot['saved_at']}</p>
+<div class="grid">
+  <div class="card"><div>Plan Name</div><div class="metric">{snapshot['plan_name']}</div></div>
+  <div class="card"><div>Confidence</div><div class="metric">{snapshot['confidence']}</div></div>
+  <div class="card"><div>Readiness Score</div><div class="metric">{snapshot['readiness_score']}/100</div></div>
+  <div class="card"><div>Target Retirement Age</div><div class="metric">{snapshot['retirement_age']}</div></div>
+</div>
+<h2>Core Numbers</h2>
+<ul>
+  <li>Annual spending: {money(snapshot['annual_spending'])}</li>
+  <li>Guaranteed income: {money(snapshot['guaranteed_income'])}</li>
+  <li>Portfolio: {money(snapshot['portfolio'])}</li>
+  <li>Portfolio gap: {money(snapshot['portfolio_gap'])}</li>
+  <li>Withdrawal rate: {snapshot['withdrawal_rate']:.1f}%</li>
+  <li>Home equity: {money(snapshot['home_equity'])}</li>
+  <li>Spouse included: {spouse_text}</li>
+</ul>
+<h2>Recommended Next Steps</h2>
+<ol>{rec_items}</ol>
+<h2>Notes</h2>
+<p>{snapshot.get('notes') or 'No notes added yet.'}</p>
+<p class="muted">Educational estimate only. Not individualized financial, legal, or tax advice.</p>
+</body>
+</html>
+"""
+
+
+def show_reports():
+    st.title("Reports")
+    st.write("Create a simple retirement blueprint report that summarizes your dashboard, Phase 1 inputs, Phase 2 retirement timing, Phase 3 income/tax picture, Phase 4 lifestyle priorities, and Phase 5 action plan.")
+    st.markdown("<div class='soft-box'>This report is local to your session for now. Later we can add branded PDFs, advisor-ready reports, and permanent saved report history.</div>", unsafe_allow_html=True)
+
+    snapshot = current_plan_snapshot()
+    projection_df = pd.DataFrame(project_portfolio())
+
+    st.subheader("Report Preview")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Readiness Score", f"{snapshot['readiness_score']}/100")
+    c2.metric("Confidence", snapshot["confidence"])
+    c3.metric("Retirement Age", f"Age {snapshot['retirement_age']}")
+    c4.metric("Withdrawal Rate", f"{snapshot['withdrawal_rate']:.1f}%")
+
+    st.subheader("Executive Summary")
+    st.write(f"Your current plan targets retirement at age **{snapshot['retirement_age']}** and plans through age **{snapshot['planning_horizon']}**. Based on the current inputs, the simplified readiness score is **{snapshot['readiness_score']}/100** with a confidence level of **{snapshot['confidence']}**.")
+    st.write(f"Estimated annual spending is **{money(snapshot['annual_spending'])}**. Guaranteed income covers **{money(snapshot['guaranteed_income'])}**, leaving an estimated portfolio gap of **{money(snapshot['portfolio_gap'])}** per year before taxes and detailed timing adjustments.")
+
+    st.subheader("Recommendation Summary")
+    for i, rec in enumerate(snapshot.get("recommendations", []), start=1):
+        st.markdown(f"**{i}.** {rec}")
+
+    st.subheader("Projection Table")
+    projection_view = projection_df.copy()
+    projection_view["Portfolio"] = projection_view["Portfolio"].map(lambda x: money(x))
+    projection_view["Withdrawal"] = projection_view["Withdrawal"].map(lambda x: money(x))
+    st.dataframe(projection_view, use_container_width=True, hide_index=True)
+
+    st.subheader("Downloads")
+    report_html = build_report_html()
+    csv_data = projection_df.to_csv(index=False)
+    json_data = json.dumps(snapshot, indent=2)
+
+    d1, d2, d3 = st.columns(3)
+    d1.download_button("Download HTML Report", data=report_html, file_name="retirement_blueprint_report.html", mime="text/html", use_container_width=True)
+    d2.download_button("Download Projection CSV", data=csv_data, file_name="retirement_projection.csv", mime="text/csv", use_container_width=True)
+    d3.download_button("Download Plan JSON", data=json_data, file_name="retirement_blueprint_plan.json", mime="application/json", use_container_width=True)
+
+    with st.expander("What this report includes"):
+        st.write("This report currently includes your core score, retirement age, spending, guaranteed income, portfolio gap, withdrawal rate, key recommendations, and a projection table. Future versions can add branded PDF export, tax schedules, Roth conversion summaries, and advisor-ready scenario comparisons.")
+
+
 def placeholder(title):
     st.title(title)
     st.info("This phase is coming next. The goal is to build one stable phase at a time.")
@@ -808,7 +901,7 @@ elif nav == "Phase 4 — Lifestyle":
 elif nav == "Phase 5 — My Plans":
     show_phase5()
 elif nav == "Reports":
-    placeholder("Reports")
+    show_reports()
 elif nav == "AI Coach":
     placeholder("AI Coach")
 else:
