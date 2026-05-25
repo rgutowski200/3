@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 + Tax Estimator v3"
+BUILD_LABEL = "Clean Phase 5 + Tax Estimator + AI Coach v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -1677,6 +1677,208 @@ def show_reports():
         st.write("This report currently includes your core score, retirement age, spending, guaranteed income, portfolio gap, withdrawal rate, key recommendations, and a projection table. Future versions can add branded PDF export, tax schedules, Roth conversion summaries, and advisor-ready scenario comparisons.")
 
 
+
+
+def plan_context_for_ai():
+    """Create a compact, non-sensitive summary of the user's current plan for the AI coach."""
+    score = readiness_score()
+    context = {
+        "plan_name": st.session_state.get("plan_name"),
+        "current_age": st.session_state.get("age"),
+        "target_retirement_age": st.session_state.get("retire_age"),
+        "planning_horizon_age": st.session_state.get("plan_age"),
+        "annual_household_income": st.session_state.get("current_income"),
+        "annual_spending_estimate": annual_spending(),
+        "monthly_spending_estimate": st.session_state.get("monthly_spending"),
+        "portfolio_total": portfolio_total(),
+        "traditional_balance": st.session_state.get("traditional"),
+        "roth_balance": st.session_state.get("roth"),
+        "taxable_cash_balance": st.session_state.get("taxable_cash"),
+        "hsa_balance": st.session_state.get("hsa_balance"),
+        "home_equity": st.session_state.get("home_equity"),
+        "mortgage": st.session_state.get("mortgage"),
+        "annual_social_security": st.session_state.get("social_security"),
+        "social_security_start_age": st.session_state.get("ss_start_age"),
+        "pension_income": st.session_state.get("pension_income"),
+        "other_income": st.session_state.get("other_income"),
+        "spouse_included": st.session_state.get("spouse_enabled"),
+        "spouse_age": st.session_state.get("spouse_age") if st.session_state.get("spouse_enabled") else None,
+        "spouse_social_security": st.session_state.get("spouse_ss") if st.session_state.get("spouse_enabled") else None,
+        "bucket1_balance": st.session_state.get("bucket1_balance"),
+        "bucket1_return": st.session_state.get("bucket1_return"),
+        "bucket2_balance": st.session_state.get("bucket2_balance"),
+        "bucket2_return": st.session_state.get("bucket2_return"),
+        "blended_bucket_return": round(bucket_blended_return(), 2),
+        "filing_status": st.session_state.get("filing_status"),
+        "estimated_tax_rate": st.session_state.get("tax_rate"),
+        "aca_sensitive": st.session_state.get("aca_sensitive"),
+        "rule55_eligible": st.session_state.get("rule55_eligible"),
+        "readiness_score": score,
+        "confidence": confidence_label(score),
+    }
+    return context
+
+
+def local_ai_coach_response(question):
+    """Rule-based fallback when no OpenAI key is configured."""
+    score = readiness_score()
+    gap = max(0, annual_spending() - guaranteed_income())
+    withdrawal_rate = gap / max(portfolio_total(), 1) * 100
+    ideas = []
+
+    if withdrawal_rate > 5:
+        ideas.append("Your estimated portfolio withdrawal need looks elevated. Phase 2 can test delaying retirement, lowering spending, or increasing guaranteed income.")
+    else:
+        ideas.append("Your estimated first-year withdrawal need appears more manageable based on the current inputs.")
+
+    if st.session_state.get("aca_sensitive") and st.session_state.age < 65:
+        ideas.append("Because healthcare before Medicare may matter, be careful with taxable income in the bridge years and test ACA-sensitive scenarios in Phase 3.")
+
+    if float(st.session_state.get("traditional", 0)) > float(st.session_state.get("roth", 0)) * 3:
+        ideas.append("You have much more traditional money than Roth money. That can make Roth conversion years worth exploring before RMD age.")
+
+    if st.session_state.retire_age < 65:
+        ideas.append("Retiring before Medicare creates a healthcare bridge period. Make sure Phase 2 includes healthcare costs from retirement age to 65.")
+
+    if not ideas:
+        ideas.append("Your plan does not show an obvious red flag from the high-level inputs, but it is still worth stress-testing returns, taxes, and spending flexibility.")
+
+    return "\n\n".join([
+        "**AI Coach preview — no API key connected yet**",
+        f"Based on the current plan, your readiness score is **{score}/100** and the estimated first-year portfolio withdrawal rate is about **{withdrawal_rate:.1f}%**.",
+        "\n".join([f"- {idea}" for idea in ideas]),
+        "This is educational guidance only, not financial, tax, or legal advice."
+    ])
+
+
+def call_openai_coach(question, context):
+    """Call OpenAI only when OPENAI_API_KEY is available in Streamlit secrets."""
+    from openai import OpenAI
+
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    model = st.secrets.get("OPENAI_MODEL", "gpt-4o-mini")
+
+    system_prompt = """
+You are the AI Coach inside Retirement Blueprint 101, an educational retirement planning app.
+You are not a CFP, CPA, attorney, or fiduciary. Do not claim to provide personalized financial, tax, legal, or investment advice.
+Use plain English for adults 50+.
+Use the user's current app inputs as context, but treat all calculations as estimates.
+Give practical next steps and point users to app phases: Phase 1 Foundation, Phase 2 Retirement Lab, Phase 3 Income & Tax, Phase 4 Lifestyle, Phase 5 My Plans.
+Do not recommend specific securities, market timing, or guaranteed returns.
+When taxes, Roth conversions, ACA, RMDs, Social Security, or Rule of 55 are involved, remind the user to verify with a qualified professional.
+Keep answers concise, structured, and action-oriented.
+"""
+
+    user_prompt = f"""
+Current retirement plan context:
+{json.dumps(context, indent=2)}
+
+User question:
+{question}
+"""
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.3,
+        max_tokens=700,
+    )
+    return response.choices[0].message.content
+
+
+def show_ai_coach():
+    st.title("AI Coach")
+    section_guide(
+        "AI Coach",
+        "Ask plain-English questions about your current retirement plan. The coach uses the inputs from your dashboard and phases to explain trade-offs, risks, and next steps.",
+        "It can summarize your plan, highlight risk areas, suggest which phase to revisit, explain taxes/withdrawals in plain English, and help you think through retirement timing or lifestyle trade-offs.",
+        "Use it as an educational planning assistant, not as a replacement for a CFP, CPA, attorney, or fiduciary advisor."
+    )
+
+    st.info("The AI Coach is educational only. It does not provide personalized financial, tax, legal, or investment advice.")
+
+    context = plan_context_for_ai()
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Readiness Score", f"{context['readiness_score']}/100")
+    c2.metric("Confidence", context["confidence"])
+    c3.metric("Portfolio", money(context["portfolio_total"]))
+    c4.metric("Annual Spending", money(context["annual_spending_estimate"]))
+
+    st.markdown("### Suggested questions")
+    qcols = st.columns(2)
+    examples = [
+        "What are the biggest risks in my current retirement plan?",
+        "Should I focus more on reducing spending or delaying retirement?",
+        "How should I think about Roth conversions before RMD age?",
+        "What should I review before retiring before Medicare?",
+        "What does my two-bucket strategy tell me?",
+        "Which phase of the app should I work on next?",
+    ]
+    for i, example in enumerate(examples):
+        with qcols[i % 2]:
+            if st.button(example, key=f"ai_example_{i}"):
+                st.session_state["ai_question"] = example
+
+    st.markdown("### Ask your coach")
+    question = st.text_area(
+        "Your question",
+        key="ai_question",
+        height=120,
+        placeholder="Example: Can I retire at 58, and what would make the plan safer?",
+        help="Ask about your plan, retirement timing, taxes, withdrawals, Roth conversions, Social Security, healthcare bridge years, or lifestyle trade-offs."
+    )
+
+    col_a, col_b = st.columns([1, 3])
+    with col_a:
+        ask = st.button("Ask AI Coach", type="primary")
+    with col_b:
+        has_key = bool(st.secrets.get("OPENAI_API_KEY")) if hasattr(st, "secrets") else False
+        if has_key:
+            st.caption("Connected to OpenAI through Streamlit Secrets.")
+        else:
+            st.caption("No OpenAI key connected yet. The app will show a rule-based coach preview.")
+
+    if ask:
+        if not question.strip():
+            st.warning("Enter a question first.")
+        else:
+            with st.spinner("Reviewing your retirement blueprint..."):
+                try:
+                    if has_key:
+                        answer = call_openai_coach(question, context)
+                    else:
+                        answer = local_ai_coach_response(question)
+                    st.session_state.setdefault("ai_history", []).append({
+                        "question": question,
+                        "answer": answer,
+                        "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    })
+                except Exception as e:
+                    st.error(f"AI Coach error: {e}")
+                    st.caption("Check OPENAI_API_KEY in Streamlit Secrets and make sure openai is listed in requirements.txt.")
+
+    if st.session_state.get("ai_history"):
+        st.markdown("### Coach conversation")
+        for item in reversed(st.session_state["ai_history"][-5:]):
+            with st.expander(f"Q: {item['question'][:90]}", expanded=True):
+                st.markdown(f"**Asked:** {item['time']}")
+                st.markdown(item["answer"])
+
+    st.markdown("### Setup notes")
+    with st.expander("How to connect the real OpenAI API", expanded=False):
+        st.markdown("""
+1. Add `openai` to `requirements.txt`.
+2. In Streamlit Cloud, open your app settings and add a secret named `OPENAI_API_KEY`.
+3. Optional: add `OPENAI_MODEL = "gpt-4o-mini"` or another model you have access to.
+4. Reboot the app.
+
+Keep the API key in Streamlit Secrets only. Do not paste it into GitHub.
+""")
+
+
 def placeholder(title):
     st.title(title)
     st.info("This phase is coming next. The goal is to build one stable phase at a time.")
@@ -1696,6 +1898,6 @@ elif nav == "Phase 5 — My Plans":
 elif nav == "Reports":
     show_reports()
 elif nav == "AI Coach":
-    placeholder("AI Coach")
+    show_ai_coach()
 else:
     placeholder("Resources")
