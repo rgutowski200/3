@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 Local Save Import v1"
+BUILD_LABEL = "Clean Phase 5 + Two Bucket Strategy v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -92,6 +92,11 @@ def init_state():
         "traditional": 680000,
         "roth": 110000,
         "taxable_cash": 60000,
+        "bucket1_balance": 450000,
+        "bucket2_balance": 400000,
+        "bucket1_return": 4.5,
+        "bucket2_return": 8.0,
+        "bucket1_years": 3,
         "home_equity": 300000,
         "home_value": 450000,
         "mortgage": 150000,
@@ -125,7 +130,8 @@ PLAN_INPUT_KEYS = [
     "plan_name", "name", "age", "retire_age", "plan_age",
     "current_income", "monthly_spending", "other_income", "pension_income",
     "social_security", "ss_start_age", "portfolio", "traditional", "roth",
-    "taxable_cash", "home_equity", "home_value", "mortgage",
+    "taxable_cash", "bucket1_balance", "bucket2_balance", "bucket1_return",
+    "bucket2_return", "bucket1_years", "home_equity", "home_value", "mortgage",
     "healthcare_monthly", "inflation", "growth_return", "safe_return",
     "tax_rate", "roth_conversion", "aca_target_income",
     "spouse_enabled", "spouse_age", "spouse_income", "spouse_ss", "spouse_ss_start_age",
@@ -208,6 +214,69 @@ def guaranteed_income():
 
 def portfolio_total():
     return float(st.session_state.traditional) + float(st.session_state.roth) + float(st.session_state.taxable_cash)
+
+
+def bucket_total():
+    return float(st.session_state.get("bucket1_balance", 0)) + float(st.session_state.get("bucket2_balance", 0))
+
+
+def bucket_blended_return():
+    total = bucket_total()
+    if total <= 0:
+        return float(st.session_state.get("growth_return", 7.0))
+    b1 = float(st.session_state.get("bucket1_balance", 0))
+    b2 = float(st.session_state.get("bucket2_balance", 0))
+    r1 = float(st.session_state.get("bucket1_return", 4.5))
+    r2 = float(st.session_state.get("bucket2_return", 8.0))
+    return ((b1 * r1) + (b2 * r2)) / total
+
+
+def auto_bucket_split():
+    total = portfolio_total()
+    target_b1 = min(total, annual_spending() * float(st.session_state.get("bucket1_years", 3)))
+    st.session_state.bucket1_balance = round(target_b1, 0)
+    st.session_state.bucket2_balance = round(max(0, total - target_b1), 0)
+
+
+def project_two_bucket(retire_age=None, plan_age=None):
+    age = int(st.session_state.age)
+    retire_age = int(retire_age if retire_age is not None else st.session_state.retire_age)
+    plan_age = int(plan_age if plan_age is not None else st.session_state.plan_age)
+    b1 = float(st.session_state.get("bucket1_balance", 0))
+    b2 = float(st.session_state.get("bucket2_balance", 0))
+    r1 = float(st.session_state.get("bucket1_return", 4.5)) / 100
+    r2 = float(st.session_state.get("bucket2_return", 8.0)) / 100
+    spend = annual_spending()
+    income = guaranteed_income()
+    rows = []
+    for a in range(age, plan_age + 1):
+        withdrawal = 0
+        transfer_to_bucket1 = 0
+        if a < retire_age:
+            b1 = b1 * (1 + r1)
+            b2 = b2 * (1 + r2)
+        else:
+            withdrawal = max(0, spend - income)
+            b1 = b1 * (1 + r1)
+            b2 = b2 * (1 + r2)
+            if b1 < withdrawal and b2 > 0:
+                transfer_to_bucket1 = min(b2, max(0, annual_spending() * float(st.session_state.get("bucket1_years", 3)) - b1))
+                b2 -= transfer_to_bucket1
+                b1 += transfer_to_bucket1
+            draw_from_b1 = min(b1, withdrawal)
+            b1 -= draw_from_b1
+            remaining = max(0, withdrawal - draw_from_b1)
+            if remaining > 0:
+                b2 = max(0, b2 - remaining)
+        rows.append({
+            "Age": a,
+            "Bucket 1": b1,
+            "Bucket 2": b2,
+            "Total Portfolio": b1 + b2,
+            "Annual Withdrawal": withdrawal,
+            "Transfer to Bucket 1": transfer_to_bucket1,
+        })
+    return pd.DataFrame(rows)
 
 
 def readiness_score():
@@ -525,6 +594,67 @@ def show_phase2():
         help="Choose whether to view only your selected return or compare multiple return scenarios.",
     )
 
+    st.divider()
+    st.subheader("Two-Bucket Strategy")
+    st.write("Model a safer near-term bucket and a growth bucket with different return assumptions.")
+
+    b1, b2, b3 = st.columns(3)
+    b1.number_input(
+        "Bucket 1 balance",
+        min_value=0,
+        step=10000,
+        key="bucket1_balance",
+        help="Money intended for near-term retirement spending. This is usually cash, CDs, short-term bonds, or other lower-volatility assets.",
+    )
+    b2.number_input(
+        "Bucket 2 balance",
+        min_value=0,
+        step=10000,
+        key="bucket2_balance",
+        help="Money intended for long-term growth. This is usually a more aggressive investment bucket held for later retirement years.",
+    )
+    b3.number_input(
+        "Bucket 1 spending years",
+        min_value=1,
+        max_value=7,
+        step=1,
+        key="bucket1_years",
+        help="How many years of spending you want in the safer bucket. A common planning range is about 2–4 years.",
+    )
+
+    r1, r2, r3 = st.columns(3)
+    r1.slider(
+        "Bucket 1 return (%)",
+        min_value=0.0,
+        max_value=25.0,
+        value=float(st.session_state.bucket1_return),
+        step=0.25,
+        key="bucket1_return",
+        help="Expected annual return for the safer bucket. Lower-risk assets often use a lower return assumption.",
+    )
+    r2.slider(
+        "Bucket 2 return (%)",
+        min_value=0.0,
+        max_value=25.0,
+        value=float(st.session_state.bucket2_return),
+        step=0.25,
+        key="bucket2_return",
+        help="Expected annual return for the growth bucket. This is usually higher, but also assumes more volatility.",
+    )
+    if r3.button("Auto-split from portfolio", use_container_width=True, help="Sets Bucket 1 to your annual spending times your target Bucket 1 years, then puts the rest in Bucket 2."):
+        auto_bucket_split()
+        st.rerun()
+
+    blended = bucket_blended_return()
+    total_bucket = bucket_total()
+    total_gap = portfolio_total() - total_bucket
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Bucket Total", money(total_bucket))
+    m2.metric("Weighted Avg Return", f"{blended:.2f}%")
+    m3.metric("Portfolio Difference", money(total_gap))
+    if abs(total_gap) > 1000:
+        st.warning("Your Bucket 1 + Bucket 2 total does not match your total portfolio from Phase 1. Use Auto-split or adjust the bucket balances if you want them to match.")
+
     if not compare_ages:
         st.warning("Choose at least one retirement age to compare.")
         return
@@ -619,6 +749,37 @@ def show_phase2():
         use_container_width=True,
     )
 
+    st.divider()
+    st.subheader("Two-Bucket Projection")
+    st.write("This view shows how Bucket 1 and Bucket 2 may move over time using their separate return assumptions.")
+    bucket_df = project_two_bucket(retire_age=st.session_state.retire_age)
+    fig_bucket = go.Figure()
+    fig_bucket.add_trace(go.Scatter(x=bucket_df["Age"], y=bucket_df["Bucket 1"], mode="lines", name="Bucket 1 — safer money", line=dict(width=3)))
+    fig_bucket.add_trace(go.Scatter(x=bucket_df["Age"], y=bucket_df["Bucket 2"], mode="lines", name="Bucket 2 — growth money", line=dict(width=3)))
+    fig_bucket.add_trace(go.Scatter(x=bucket_df["Age"], y=bucket_df["Total Portfolio"], mode="lines", name="Total", line=dict(width=4, dash="dash")))
+    fig_bucket.add_vline(x=st.session_state.retire_age, line_dash="dash", annotation_text="Retire")
+    fig_bucket.update_layout(
+        height=430,
+        title="Two-Bucket Portfolio Projection",
+        yaxis_tickprefix="$",
+        xaxis_title="Age",
+        yaxis_title="Balance",
+        margin=dict(l=10, r=10, t=55, b=10),
+    )
+    st.plotly_chart(fig_bucket, use_container_width=True)
+
+    bucket_table = bucket_df.copy()
+    for col in ["Bucket 1", "Bucket 2", "Total Portfolio", "Annual Withdrawal", "Transfer to Bucket 1"]:
+        bucket_table[col] = bucket_table[col].apply(money)
+    st.dataframe(bucket_table, use_container_width=True, hide_index=True)
+    st.download_button(
+        "Download two-bucket projection CSV",
+        data=bucket_df.to_csv(index=False).encode("utf-8"),
+        file_name="two_bucket_projection.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
+
     best = result.sort_values("Readiness Score", ascending=False).iloc[0]
     selected_df = project_portfolio(retire_age=st.session_state.retire_age, return_rate=selected_return)
     ending_balance = selected_df["Portfolio"].iloc[-1]
@@ -626,7 +787,7 @@ def show_phase2():
     total_growth = max(0, retirement_balance - portfolio_total())
 
     st.markdown(
-        f"<div class='success-box'><b>Plain-English takeaway:</b> At a <b>{selected_return:.2f}%</b> average return, your portfolio could grow by about <b>{money(total_growth)}</b> before retirement at age <b>{int(st.session_state.retire_age)}</b>. In this comparison, retiring at <b>{int(best['Retire Age'])}</b> has the strongest score. The biggest pressure points are the healthcare bridge before Medicare and the annual portfolio withdrawal need.</div>",
+        f"<div class='success-box'><b>Plain-English takeaway:</b> At a <b>{selected_return:.2f}%</b> average return, your portfolio could grow by about <b>{money(total_growth)}</b> before retirement at age <b>{int(st.session_state.retire_age)}</b>. In this comparison, retiring at <b>{int(best['Retire Age'])}</b> has the strongest score. The biggest pressure points are the healthcare bridge before Medicare, the annual portfolio withdrawal need, and whether Bucket 1 is large enough to avoid selling growth assets during bad markets.</div>",
         unsafe_allow_html=True,
     )
 
@@ -879,6 +1040,11 @@ def current_plan_snapshot():
         "portfolio_gap": float(gap),
         "withdrawal_rate": float(gap / max(portfolio, 1) * 100),
         "home_equity": float(st.session_state.home_equity),
+        "bucket1_balance": float(st.session_state.get("bucket1_balance", 0)),
+        "bucket2_balance": float(st.session_state.get("bucket2_balance", 0)),
+        "bucket1_return": float(st.session_state.get("bucket1_return", 0)),
+        "bucket2_return": float(st.session_state.get("bucket2_return", 0)),
+        "bucket_blended_return": float(bucket_blended_return()),
         "spouse_included": bool(st.session_state.spouse_enabled),
         "notes": st.session_state.get("p5_notes", ""),
         "tags": st.session_state.get("p5_tags", []),
