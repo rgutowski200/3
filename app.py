@@ -1979,9 +1979,9 @@ def show_resources():
         st.write("Healthcare is one of the biggest early-retirement planning gaps, especially for people retiring before Medicare eligibility.")
         healthcare_rows = pd.DataFrame([
             {"Age range": "Before 65", "Planning issue": "Need health insurance before Medicare; marketplace/ACA costs may depend on income."},
-            {"Age 65+", "Planning issue": "Medicare begins for most people, but premiums, supplements, prescriptions, dental, vision, and long-term care still matter."},
-            {"High income later", "Planning issue": "Higher retirement income may increase Medicare-related costs through IRMAA."},
-            {"Long-term care", "Planning issue": "Not the same as normal healthcare. May require separate planning, insurance, or self-funding."},
+            {"Age range": "Age 65+", "Planning issue": "Medicare begins for most people, but premiums, supplements, prescriptions, dental, vision, and long-term care still matter."},
+            {"Age range": "High income later", "Planning issue": "Higher retirement income may increase Medicare-related costs through IRMAA."},
+            {"Age range": "Long-term care", "Planning issue": "Not the same as normal healthcare. May require separate planning, insurance, or self-funding."},
         ])
         st.dataframe(healthcare_rows, use_container_width=True, hide_index=True)
         st.warning("Healthcare assumptions can change quickly by state, age, income, employer coverage, and law. Treat app numbers as estimates.")
