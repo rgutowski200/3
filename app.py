@@ -108,6 +108,9 @@ def init_state():
         "spouse_ss": 24000,
         "spouse_ss_start_age": 62,
         "phase2_compare_ages": [58, 62, 65, 67],
+        "sidebar_age": 55,
+        "sidebar_retire_age": 58,
+        "sidebar_monthly_spending": 10400,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -191,6 +194,26 @@ def dashboard_chart():
     return fig
 
 # ------------------------------------------------------------
+# Input sync helpers
+# ------------------------------------------------------------
+def sync_from_sidebar():
+    st.session_state.age = int(st.session_state.sidebar_age)
+    st.session_state.retire_age = int(st.session_state.sidebar_retire_age)
+    st.session_state.monthly_spending = int(st.session_state.sidebar_monthly_spending)
+
+
+def apply_household_updates():
+    st.session_state.age = int(st.session_state.phase1_age)
+    st.session_state.retire_age = int(st.session_state.phase1_retire_age)
+    st.session_state.sidebar_age = int(st.session_state.phase1_age)
+    st.session_state.sidebar_retire_age = int(st.session_state.phase1_retire_age)
+
+
+def apply_spending_updates():
+    st.session_state.monthly_spending = int(st.session_state.phase1_monthly_spending)
+    st.session_state.sidebar_monthly_spending = int(st.session_state.phase1_monthly_spending)
+
+# ------------------------------------------------------------
 # Sidebar
 # ------------------------------------------------------------
 with st.sidebar:
@@ -224,9 +247,9 @@ with st.sidebar:
     st.divider()
     st.markdown("### Quick Assumptions")
     st.text_input("Plan name", key="plan_name")
-    st.number_input("Your age", min_value=45, max_value=90, key="age", step=1)
-    st.slider("Target retirement age", 50, 75, key="retire_age")
-    st.number_input("Estimated monthly spend", min_value=0, step=500, key="monthly_spending")
+    st.number_input("Your age", min_value=45, max_value=90, key="sidebar_age", step=1, on_change=sync_from_sidebar)
+    st.slider("Target retirement age", 50, 75, key="sidebar_retire_age", on_change=sync_from_sidebar)
+    st.number_input("Estimated monthly spend", min_value=0, step=500, key="sidebar_monthly_spending", on_change=sync_from_sidebar)
     st.caption(f"Build: {BUILD_LABEL}")
 
 # ------------------------------------------------------------
@@ -306,9 +329,7 @@ def show_phase1():
         c4, c5 = st.columns(2)
         c4.slider("Plan through age", 75, 100, key="plan_age")
         planning_depth = c5.selectbox("Planning depth", ["Simple", "Standard", "Advanced"], index=1)
-        if st.button("Apply household updates"):
-            st.session_state.age = st.session_state.phase1_age
-            st.session_state.retire_age = st.session_state.phase1_retire_age
+        if st.button("Apply household updates", on_click=apply_household_updates):
             st.success("Household updates applied.")
         if planning_depth == "Advanced":
             st.info("Advanced mode adds more assumptions in Phase 2 and Phase 3.")
