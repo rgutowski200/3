@@ -5,194 +5,196 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 
-# ----------------------------
-# App Styling
-# ----------------------------
+# ------------------------------------------------------------
+# Clean build marker
+# ------------------------------------------------------------
+BUILD_LABEL = "Clean Phase 4 Lifestyle v1"
+
+# ------------------------------------------------------------
+# Styling
+# ------------------------------------------------------------
 st.markdown(
     """
     <style>
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-    }
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #061A3A 0%, #081F45 100%);
-    }
-    [data-testid="stSidebar"] * {
-        color: white !important;
-    }
+    .block-container {padding-top: 2rem; padding-bottom: 3rem; max-width: 1220px;}
+    [data-testid="stSidebar"] {background: linear-gradient(180deg, #061A3A 0%, #081F45 100%);} 
+    [data-testid="stSidebar"] * {color: white !important;}
+    [data-testid="stSidebar"] input {color: #111827 !important; background: white !important;}
+    [data-testid="stSidebar"] .stSlider div[data-baseweb="slider"] * {color: white !important;}
     .metric-card {
         background: #ffffff;
         border: 1px solid #e6eaf0;
         border-radius: 18px;
         padding: 22px;
-        min-height: 155px;
+        min-height: 160px;
         box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
     }
-    .small-muted {
-        color: #64748b;
-        font-size: 0.92rem;
-    }
-    .good {
-        color: #159947;
-        font-weight: 700;
-    }
-    .blue-banner {
-        background: #eaf4ff;
-        border: 1px solid #cfe8ff;
+    .metric-label {font-size: 0.92rem; font-weight: 700; color: #111827; margin-bottom: 18px;}
+    .metric-value {font-size: 2.2rem; font-weight: 800; color: #111827; line-height: 1.1;}
+    .metric-note {font-size: 0.9rem; color: #64748b; margin-top: 10px;}
+    .green {color: #159947 !important; font-weight: 800;}
+    .soft-box {
+        background: #eef6ff;
+        border: 1px solid #d7eafe;
         border-radius: 14px;
-        padding: 16px 18px;
-        color: #0f4c81;
+        padding: 16px 20px;
+        color: #075985;
     }
-    .locked-card {
-        border: 1px dashed #cbd5e1;
+    .success-box {
+        background: #e9f9ef;
+        border: 1px solid #c8f0d4;
+        border-radius: 14px;
+        padding: 16px 20px;
+        color: #166534;
+    }
+    .warn-box {
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        border-radius: 14px;
+        padding: 16px 20px;
+        color: #9a3412;
+    }
+    .section-title {font-size: 1.35rem; font-weight: 800; margin-top: 1.3rem; margin-bottom: 0.6rem;}
+    .small-muted {color:#64748b; font-size:0.9rem;}
+    div[data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #e6eaf0;
         border-radius: 16px;
-        padding: 18px;
-        background: #f8fafc;
+        padding: 16px;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ----------------------------
-# Session State Defaults
-# ----------------------------
-defaults = {
-    "nav_page": "Dashboard",
-    "premium_demo": True,
-    "plan_name": "Base Plan",
+# ------------------------------------------------------------
+# Session defaults
+# ------------------------------------------------------------
+def init_state():
+    defaults = {
+        "nav": "Dashboard",
+        "premium_demo": True,
+        "plan_name": "Base Plan",
+        "name": "John",
+        "age": 55,
+        "retire_age": 58,
+        "plan_age": 90,
+        "current_income": 140000,
+        "monthly_spending": 10400,
+        "other_income": 6000,
+        "pension_income": 0,
+        "social_security": 24000,
+        "ss_start_age": 62,
+        "portfolio": 850000,
+        "traditional": 680000,
+        "roth": 110000,
+        "taxable_cash": 60000,
+        "home_equity": 300000,
+        "home_value": 450000,
+        "mortgage": 150000,
+        "healthcare_monthly": 1000,
+        "inflation": 3.0,
+        "growth_return": 7.0,
+        "safe_return": 4.5,
+        "tax_rate": 18.0,
+        "roth_conversion": 0,
+        "aca_target_income": 60000,
+        "spouse_enabled": False,
+        "spouse_age": 53,
+        "spouse_income": 0,
+        "spouse_ss": 24000,
+        "spouse_ss_start_age": 62,
+        "phase2_compare_ages": [58, 62, 65, 67],
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
-    "phase1_name": "John",
-    "phase1_age": 55,
-    "phase1_retire_age": 58,
-    "phase1_plan_age": 90,
-    "phase1_depth": "Simple",
+init_state()
 
-    "phase1_income": 140000,
-    "phase1_other_income": 0,
-    "phase1_monthly_spending": 10400,
-    "phase1_use_detailed_budget": False,
-
-    "budget_housing": 3000,
-    "budget_food": 1200,
-    "budget_healthcare": 1000,
-    "budget_travel": 1500,
-    "budget_transportation": 900,
-    "budget_insurance": 700,
-    "budget_entertainment": 900,
-    "budget_other": 1200,
-
-    "phase1_ss_age": 62,
-    "phase1_social_security": 24000,
-    "phase1_portfolio": 850000,
-    "phase1_home_equity": 300000,
-    "phase1_debt": 0,
-
-    "phase1_spouse_enabled": False,
-    "phase1_spouse_age": 53,
-    "phase1_spouse_income": 0,
-    "phase1_spouse_ss": 24000,
-
-    "phase1_healthcare_bridge": 12000,
-    "phase1_bucket_years": 3.0,
-    "phase1_inflation": 3.0,
-    "phase1_growth_return": 7.0,
-
-    "phase1_roth_conversion": 0,
-    "phase1_tax_rate": 18.0,
-    "phase1_aca_magi_target": 60000,
-    "phase1_bad_market": -20.0,
-
-    "phase3_pension": 0,
-    "phase3_part_time": 0,
-    "phase3_rental_income": 0,
-    "phase3_other_income": 0,
-    "phase3_federal_tax_rate": 12.0,
-    "phase3_state_tax_rate": 4.0,
-    "phase3_roth_conversion": 0,
-    "phase3_conversion_tax_rate": 18.0,
-    "phase3_rmd_age": 75,
-    "phase3_taxable_balance_pct": 80.0,
-    "phase3_aca_target_magi": 60000,
-    "phase3_current_magi": 0,
-}
+# ------------------------------------------------------------
+# Data helpers
+# ------------------------------------------------------------
+def money(x):
+    return f"${float(x):,.0f}"
 
 
-for key, value in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
+def pct(x):
+    return f"{float(x):.0f}%"
 
-# ----------------------------
-# Helper Functions
-# ----------------------------
-def money(value):
-    return f"${value:,.0f}"
-
-def pct(value):
-    return f"{value:.0f}%"
 
 def annual_spending():
-    if st.session_state.phase1_use_detailed_budget:
-        total = (
-            st.session_state.budget_housing
-            + st.session_state.budget_food
-            + st.session_state.budget_healthcare
-            + st.session_state.budget_travel
-            + st.session_state.budget_transportation
-            + st.session_state.budget_insurance
-            + st.session_state.budget_entertainment
-            + st.session_state.budget_other
-        )
-        return total * 12
-    return st.session_state.phase1_monthly_spending * 12
+    return float(st.session_state.monthly_spending) * 12
+
 
 def guaranteed_income():
-    total = st.session_state.phase1_social_security + st.session_state.phase1_other_income
-    if st.session_state.phase1_spouse_enabled:
-        total += st.session_state.phase1_spouse_ss + st.session_state.phase1_spouse_income
-    return total
+    spouse = st.session_state.spouse_ss if st.session_state.spouse_enabled else 0
+    return float(st.session_state.social_security) + float(st.session_state.pension_income) + float(st.session_state.other_income) + float(spouse)
+
+
+def portfolio_total():
+    return float(st.session_state.traditional) + float(st.session_state.roth) + float(st.session_state.taxable_cash)
+
 
 def readiness_score():
-    spending = max(annual_spending(), 1)
-    income = guaranteed_income()
-    portfolio_income = st.session_state.phase1_portfolio * 0.04
-    coverage = (income + portfolio_income) / spending
-    score = int(min(100, max(0, coverage * 82)))
-    return score
+    spend = max(annual_spending(), 1)
+    income_coverage = min(100, guaranteed_income() / spend * 100)
+    portfolio_income = portfolio_total() * 0.04
+    portfolio_coverage = min(100, portfolio_income / max(spend - guaranteed_income(), 1) * 100) if spend > guaranteed_income() else 100
+    timing_bonus = max(0, min(20, (st.session_state.retire_age - st.session_state.age) * 4))
+    score = 0.42 * income_coverage + 0.42 * portfolio_coverage + timing_bonus
+    return int(max(0, min(100, score)))
+
 
 def confidence_label(score):
-    if score >= 75:
+    if score >= 80:
         return "High"
-    if score >= 55:
-        return "Medium"
-    return "Needs Review"
+    if score >= 60:
+        return "Moderate"
+    if score >= 40:
+        return "Needs Review"
+    return "Low"
 
-def save_phase1():
-    saved = {}
-    for key in list(st.session_state.keys()):
-        if key.startswith("phase1_") or key.startswith("budget_"):
-            saved[key] = st.session_state[key]
-    st.session_state["saved_phase1"] = saved
 
-def load_phase1():
-    saved = st.session_state.get("saved_phase1", {})
-    for key, value in saved.items():
-        st.session_state[key] = value
+def project_portfolio(retire_age=None, return_rate=None, plan_age=None):
+    age = int(st.session_state.age)
+    retire_age = int(retire_age if retire_age is not None else st.session_state.retire_age)
+    plan_age = int(plan_age if plan_age is not None else st.session_state.plan_age)
+    r = float(return_rate if return_rate is not None else st.session_state.growth_return) / 100
+    portfolio = portfolio_total()
+    spend = annual_spending()
+    income = guaranteed_income()
+    rows = []
+    for a in range(age, plan_age + 1):
+        if a < retire_age:
+            portfolio = portfolio * (1 + r)
+            withdrawal = 0
+        else:
+            withdrawal = max(0, spend - income)
+            portfolio = max(0, portfolio * (1 + r) - withdrawal)
+        rows.append({"Age": a, "Portfolio": portfolio, "Withdrawal": withdrawal})
+    return pd.DataFrame(rows)
 
-def clear_phase1():
-    for key, value in defaults.items():
-        if key.startswith("phase1_") or key.startswith("budget_"):
-            st.session_state[key] = value
 
-# ----------------------------
+def dashboard_chart():
+    df = project_portfolio()
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df["Age"], y=df["Portfolio"], mode="lines", name="Portfolio", line=dict(width=3)))
+    fig.add_vline(x=st.session_state.retire_age, line_dash="dash", annotation_text="Retire")
+    fig.add_vline(x=st.session_state.ss_start_age, line_dash="dot", annotation_text="Social Security")
+    fig.update_layout(height=330, margin=dict(l=10, r=10, t=20, b=10), yaxis_tickprefix="$", yaxis_title="Portfolio", xaxis_title="Age")
+    return fig
+
+# ------------------------------------------------------------
 # Sidebar
-# ----------------------------
+# ------------------------------------------------------------
 with st.sidebar:
-    st.markdown("## 📈 RETIREMENT\n## BLUEPRINT 101")
+    st.markdown("## 📈 RETIREMENT")
+    st.markdown("### BLUEPRINT 101")
     st.divider()
 
-    page = st.radio(
+    nav = st.radio(
         "Navigation",
         [
             "Dashboard",
@@ -205,632 +207,440 @@ with st.sidebar:
             "AI Coach",
             "Resources",
         ],
-        key="nav_page",
+        key="nav",
     )
 
     st.divider()
-
     st.toggle("Premium demo unlocked", key="premium_demo")
-
     if st.session_state.premium_demo:
         st.success("Premium unlocked")
     else:
         st.info("Free dashboard mode")
 
-    st.caption("Build: Phase 3 v1 — income and tax lab")
-
+    st.divider()
     st.markdown("### Quick Assumptions")
     st.text_input("Plan name", key="plan_name")
-    st.number_input("Your age", min_value=45, max_value=90, key="sidebar_age", value=st.session_state.phase1_age)
-    st.slider("Target retirement age", 50, 75, key="sidebar_retire_age", value=st.session_state.phase1_retire_age)
-    st.number_input("Estimated monthly spend", min_value=0, step=500, key="sidebar_monthly_spend", value=st.session_state.phase1_monthly_spending)
+    st.number_input("Your age", min_value=45, max_value=90, key="age", step=1)
+    st.slider("Target retirement age", 50, 75, key="retire_age")
+    st.number_input("Estimated monthly spend", min_value=0, step=500, key="monthly_spending")
+    st.caption(f"Build: {BUILD_LABEL}")
 
-    st.divider()
-    st.caption("Clean build: Dashboard + Phase 1 + Phase 2 + Phase 3")
-
-# ----------------------------
-# Dashboard
-# ----------------------------
+# ------------------------------------------------------------
+# Pages
+# ------------------------------------------------------------
 def show_dashboard():
     score = readiness_score()
     confidence = confidence_label(score)
-    spending = annual_spending()
-    income = guaranteed_income()
-    monthly_income_est = (income + st.session_state.phase1_portfolio * 0.04) / 12
+    monthly_income = (guaranteed_income() + portfolio_total() * 0.04) / 12
+    coverage = min(100, monthly_income / max(st.session_state.monthly_spending, 1) * 100)
 
-    st.markdown(f"# Good morning, {st.session_state.phase1_name}!")
+    st.title(f"Good morning, {st.session_state.name}!")
     st.write("Here’s your retirement readiness overview.")
 
     c1, c2, c3, c4 = st.columns(4)
-
     with c1:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <b>Retirement Readiness Score</b>
-                <h1>{score}<span style="font-size:1.1rem;">/100</span></h1>
-                <div class="good">{'On Track' if score >= 70 else 'Needs Review'}</div>
-                <p class="small-muted">Based on income coverage, portfolio strength, spending, and retirement timing.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Retirement Readiness Score</div>
+            <div class='metric-value'>{score}<span style='font-size:1rem;'>/100</span></div>
+            <div class='green'>{confidence}</div>
+            <div class='metric-note'>Based on income coverage, portfolio strength, spending, and retirement timing.</div>
+        </div>
+        """, unsafe_allow_html=True)
     with c2:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <b>Projected Retirement Age</b>
-                <h1>{st.session_state.phase1_retire_age}</h1>
-                <div class="good">Optimal Range: 58–63</div>
-                <p class="small-muted">Adjust this in Phase 1 to compare timing.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Projected Retirement Age</div>
+            <div class='metric-value'>{st.session_state.retire_age}</div>
+            <div class='green'>Optimal Range: 58–63</div>
+            <div class='metric-note'>Adjust in Phase 1 or test alternate ages in Phase 2.</div>
+        </div>
+        """, unsafe_allow_html=True)
     with c3:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <b>Monthly Retirement Income</b>
-                <h1>{money(monthly_income_est)}</h1>
-                <div class="good">{pct(min(100, monthly_income_est / max(spending / 12, 1) * 100))} of target spending</div>
-                <p class="small-muted">Includes Social Security, other income, and a simple 4% portfolio estimate.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Monthly Retirement Income</div>
+            <div class='metric-value'>{money(monthly_income)}</div>
+            <div class='green'>{coverage:.0f}% of target spending</div>
+            <div class='metric-note'>Includes Social Security, other income, and a simple 4% portfolio estimate.</div>
+        </div>
+        """, unsafe_allow_html=True)
     with c4:
-        st.markdown(
-            f"""
-            <div class="metric-card">
-                <b>Confidence Level</b>
-                <h1>{confidence}</h1>
-                <p class="small-muted">Your plan gets stronger as you add more detail in Phase 1.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div class='metric-label'>Confidence Level</div>
+            <div class='metric-value'>{confidence}</div>
+            <div class='metric-note'>Your plan gets stronger as you add more detail in each phase.</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("### Your Retirement Timeline")
+    st.plotly_chart(dashboard_chart(), use_container_width=True)
 
-    ages = list(range(st.session_state.phase1_age, st.session_state.phase1_plan_age + 1))
-    portfolio = []
-    bal = st.session_state.phase1_portfolio
-    for age in ages:
-        if age < st.session_state.phase1_retire_age:
-            bal = bal * (1 + st.session_state.phase1_growth_return / 100)
-        else:
-            withdrawal = max(0, spending - income)
-            bal = max(0, bal * (1 + st.session_state.phase1_growth_return / 100) - withdrawal)
-        portfolio.append(bal)
+    a, b, c = st.columns(3)
+    a.metric("Bridge Years Before Medicare", max(0, 65 - st.session_state.retire_age))
+    b.metric("Estimated Annual Spending", money(annual_spending()))
+    c.metric("Portfolio Total", money(portfolio_total()))
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=ages, y=portfolio, mode="lines", name="Portfolio"))
-    fig.add_vline(x=st.session_state.phase1_retire_age, line_dash="dash", annotation_text="Retire")
-    fig.add_vline(x=st.session_state.phase1_ss_age, line_dash="dot", annotation_text="Social Security")
-    fig.update_layout(height=340, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="Portfolio")
-    st.plotly_chart(fig, use_container_width=True)
+    st.markdown("### Your Next Steps")
+    st.write("1. Complete Phase 1 inputs.  2. Use Phase 2 to compare retirement ages.  3. Use Phase 3 to test income and tax strategy.  4. Use Phase 4 to compare retirement locations.")
 
-    l1, l2, l3 = st.columns([1, 1, 1])
-    with l1:
-        st.markdown("### Next Steps")
-        st.write("1. Complete Phase 1 Foundation")
-        st.write("2. Run a retirement age comparison")
-        st.write("3. Add Social Security and spouse assumptions")
-    with l2:
-        st.markdown("### Income Sources")
-        st.metric("Guaranteed Income", money(income))
-        st.metric("Annual Spending", money(spending))
-    with l3:
-        st.markdown("### Stress Test Snapshot")
-        st.success("Market downturn: review in Phase 2")
-        st.success("Inflation: review in Phase 3")
-        st.success("Longevity: review in Phase 5")
 
-# ----------------------------
-# Phase 1
-# ----------------------------
 def show_phase1():
-    st.markdown("# Phase 1 — Financial Foundation")
-    st.write("Build the base retirement picture: income, spending, assets, debt, Social Security, and spouse planning.")
+    st.title("Phase 1 — Financial Foundation")
+    st.write("Build the base retirement picture: income, spending, assets, debt, Social Security, and optional spouse planning.")
+    st.markdown("<div class='soft-box'>Free users can enter basic estimates. Premium users can go deeper with category spending, other income sources, spouse planning, and Social Security assumptions.</div>", unsafe_allow_html=True)
 
-    st.markdown(
-        """
-        <div class="blue-banner">
-        Free users can enter basic estimates. Premium users can go deeper with category spending,
-        other income sources, spouse planning, and Social Security assumptions.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    tabs = st.tabs([
-        "1. Household",
-        "2. Income",
-        "3. Spending",
-        "4. Social Security",
-        "5. Assets & Debt",
-        "6. Spouse / Partner",
-    ])
+    tabs = st.tabs(["1. Household", "2. Income", "3. Spending", "4. Social Security", "5. Assets & Debt", "6. Spouse / Partner"])
 
     with tabs[0]:
         st.subheader("Household Basics")
         c1, c2, c3 = st.columns(3)
-        with c1:
-            st.text_input("First name", key="phase1_name")
-        with c2:
-            st.number_input("Current age", min_value=45, max_value=90, key="phase1_age")
-        with c3:
-            st.slider("Retirement age", 50, 75, key="phase1_retire_age")
-
+        c1.text_input("First name", key="name")
+        c2.number_input("Current age", min_value=45, max_value=90, key="phase1_age", value=int(st.session_state.age))
+        c3.slider("Retirement age", 50, 75, key="phase1_retire_age", value=int(st.session_state.retire_age))
         c4, c5 = st.columns(2)
-        with c4:
-            st.slider("Plan through age", 75, 100, key="phase1_plan_age")
-        with c5:
-            st.selectbox("Planning depth", ["Simple", "Standard", "Advanced"], key="phase1_depth")
+        c4.slider("Plan through age", 75, 100, key="plan_age")
+        planning_depth = c5.selectbox("Planning depth", ["Simple", "Standard", "Advanced"], index=1)
+        if st.button("Apply household updates"):
+            st.session_state.age = st.session_state.phase1_age
+            st.session_state.retire_age = st.session_state.phase1_retire_age
+            st.success("Household updates applied.")
+        if planning_depth == "Advanced":
+            st.info("Advanced mode adds more assumptions in Phase 2 and Phase 3.")
 
     with tabs[1]:
         st.subheader("Income")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.number_input("Current household income", min_value=0, step=5000, key="phase1_income")
-        with c2:
-            st.number_input("Other annual income in retirement", min_value=0, step=1000, key="phase1_other_income")
-
-        if st.session_state.phase1_depth in ["Standard", "Advanced"]:
-            st.text_area("Describe other income resources", placeholder="Pension, rental income, annuity, part-time work, business income...")
+        c1, c2, c3 = st.columns(3)
+        c1.number_input("Current household income", min_value=0, step=5000, key="current_income")
+        c2.number_input("Annual pension income", min_value=0, step=1000, key="pension_income")
+        c3.number_input("Other annual income", min_value=0, step=1000, key="other_income")
+        st.text_area("Other income notes", placeholder="Rental income, part-time work, annuity, business income...")
 
     with tabs[2]:
         st.subheader("Spending")
-        st.checkbox("Use detailed monthly budget", key="phase1_use_detailed_budget")
-
-        if not st.session_state.phase1_use_detailed_budget:
-            st.number_input("Estimated monthly retirement spending", min_value=0, step=500, key="phase1_monthly_spending")
-        else:
-            b1, b2, b3, b4 = st.columns(4)
-            with b1:
-                st.number_input("Housing", min_value=0, step=100, key="budget_housing")
-                st.number_input("Food", min_value=0, step=100, key="budget_food")
-            with b2:
-                st.number_input("Healthcare", min_value=0, step=100, key="budget_healthcare")
-                st.number_input("Travel", min_value=0, step=100, key="budget_travel")
-            with b3:
-                st.number_input("Transportation", min_value=0, step=100, key="budget_transportation")
-                st.number_input("Insurance", min_value=0, step=100, key="budget_insurance")
-            with b4:
-                st.number_input("Entertainment", min_value=0, step=100, key="budget_entertainment")
-                st.number_input("Other", min_value=0, step=100, key="budget_other")
+        st.number_input("Estimated monthly retirement spending", min_value=0, step=500, key="monthly_spending")
+        with st.expander("Detailed monthly budget"):
+            cats = ["Housing", "Utilities", "Food", "Healthcare", "Travel", "Insurance", "Vehicles", "Entertainment", "Family support", "Other"]
+            cols = st.columns(2)
+            total = 0
+            for i, cat in enumerate(cats):
+                with cols[i % 2]:
+                    total += st.number_input(cat, min_value=0, step=100, key=f"budget_{cat.lower().replace(' ', '_')}")
+            if st.button("Use detailed budget total"):
+                st.session_state.monthly_spending = total
+                st.success(f"Monthly spending updated to {money(total)}.")
 
     with tabs[3]:
         st.subheader("Social Security")
         c1, c2 = st.columns(2)
-        with c1:
-            st.slider("Your Social Security start age", 62, 70, key="phase1_ss_age")
-        with c2:
-            st.number_input("Your annual Social Security", min_value=0, step=1000, key="phase1_social_security")
+        c1.number_input("Your annual Social Security", min_value=0, step=1000, key="social_security")
+        c2.slider("Your Social Security start age", 62, 70, key="ss_start_age")
 
     with tabs[4]:
         st.subheader("Assets & Debt")
         c1, c2, c3 = st.columns(3)
-        with c1:
-            st.number_input("Investment portfolio", min_value=0, step=10000, key="phase1_portfolio")
-        with c2:
-            st.number_input("Home equity", min_value=0, step=10000, key="phase1_home_equity")
-        with c3:
-            st.number_input("Total debt", min_value=0, step=5000, key="phase1_debt")
-
-        if st.session_state.phase1_depth in ["Standard", "Advanced"]:
-            st.markdown("### Standard Planning Assumptions")
-            c4, c5, c6 = st.columns(3)
-            with c4:
-                st.number_input("Annual healthcare bridge cost", min_value=0, step=1000, key="phase1_healthcare_bridge")
-            with c5:
-                st.number_input("Bucket 1 target years", min_value=1.0, max_value=6.0, step=0.5, key="phase1_bucket_years")
-            with c6:
-                st.slider("Inflation assumption", 0.0, 8.0, key="phase1_inflation")
-
-        if st.session_state.phase1_depth == "Advanced":
-            st.markdown("### Advanced Planning Assumptions")
-            a1, a2, a3 = st.columns(3)
-            with a1:
-                st.number_input("Annual Roth conversion to test", min_value=0, step=5000, key="phase1_roth_conversion")
-            with a2:
-                st.slider("Estimated tax rate", 0.0, 40.0, key="phase1_tax_rate")
-            with a3:
-                st.number_input("ACA MAGI target", min_value=0, step=5000, key="phase1_aca_magi_target")
-            st.slider("Bad-market stress test return", -50.0, 0.0, key="phase1_bad_market")
+        c1.number_input("Traditional 401k / IRA", min_value=0, step=10000, key="traditional")
+        c2.number_input("Roth balance", min_value=0, step=10000, key="roth")
+        c3.number_input("Taxable / cash", min_value=0, step=10000, key="taxable_cash")
+        c4, c5 = st.columns(2)
+        c4.number_input("Home value", min_value=0, step=10000, key="home_value")
+        c5.number_input("Mortgage balance", min_value=0, step=10000, key="mortgage")
+        st.session_state.home_equity = max(0, st.session_state.home_value - st.session_state.mortgage)
 
     with tabs[5]:
         st.subheader("Spouse / Partner")
-        st.checkbox("Include spouse or partner in this plan", key="phase1_spouse_enabled")
-
-        if st.session_state.phase1_spouse_enabled:
+        st.checkbox("Include spouse or partner", key="spouse_enabled")
+        if st.session_state.spouse_enabled:
             c1, c2, c3 = st.columns(3)
-            with c1:
-                st.number_input("Spouse age", min_value=45, max_value=90, key="phase1_spouse_age")
-            with c2:
-                st.number_input("Spouse annual income", min_value=0, step=5000, key="phase1_spouse_income")
-            with c3:
-                st.number_input("Spouse annual Social Security", min_value=0, step=1000, key="phase1_spouse_ss")
+            c1.number_input("Spouse age", min_value=45, max_value=90, key="spouse_age")
+            c2.number_input("Spouse annual income", min_value=0, step=5000, key="spouse_income")
+            c3.number_input("Spouse annual Social Security", min_value=0, step=1000, key="spouse_ss")
+            st.slider("Spouse Social Security start age", 62, 70, key="spouse_ss_start_age")
         else:
-            st.info("No spouse or partner is included in this scenario.")
+            st.info("No spouse or partner is included in this plan.")
 
     st.divider()
     st.subheader("Foundation Summary")
-
-    s1, s2, s3, s4 = st.columns(4)
-    s1.metric("Annual Spending", money(annual_spending()))
-    s2.metric("Guaranteed Income", money(guaranteed_income()))
-    s3.metric("Portfolio", money(st.session_state.phase1_portfolio))
-    s4.metric("Home Equity", money(st.session_state.phase1_home_equity))
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        if st.button("Save Phase 1 inputs"):
-            save_phase1()
-            st.success("Phase 1 inputs saved for this session.")
-    with c2:
-        if st.button("Load saved Phase 1"):
-            load_phase1()
-            st.success("Saved Phase 1 inputs loaded.")
-    with c3:
-        if st.button("Clear Phase 1"):
-            clear_phase1()
-            st.success("Phase 1 inputs cleared.")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Annual Spending", money(annual_spending()))
+    c2.metric("Guaranteed Income", money(guaranteed_income()))
+    c3.metric("Portfolio", money(portfolio_total()))
+    c4.metric("Home Equity", money(st.session_state.home_equity))
+    st.success("Inputs are automatically saved during this session.")
 
 
-# ----------------------------
-# Phase 2 — Retirement Lab
-# ----------------------------
-def project_portfolio(retire_age, stress_return=None):
-    start_age = st.session_state.phase1_age
-    end_age = st.session_state.phase1_plan_age
-    ages = list(range(start_age, end_age + 1))
-    spending = annual_spending()
-    guaranteed = guaranteed_income()
-    growth = st.session_state.phase1_growth_return / 100
-    if stress_return is not None:
-        growth = stress_return / 100
-
-    bal = st.session_state.phase1_portfolio
-    balances = []
-    withdrawals = []
-
-    for age in ages:
-        if age < retire_age:
-            bal = bal * (1 + growth)
-            withdrawal = 0
-        else:
-            withdrawal = max(0, spending - guaranteed)
-            bal = max(0, bal * (1 + growth) - withdrawal)
-        balances.append(bal)
-        withdrawals.append(withdrawal)
-
-    ending = balances[-1] if balances else 0
-    first_year_withdrawal = next((w for w in withdrawals if w > 0), 0)
-    success = ending > 0
-    return ages, balances, withdrawals, ending, first_year_withdrawal, success
+def phase2_table(compare_ages, return_scenario):
+    return_map = {"Conservative": 5.0, "Base": st.session_state.growth_return, "Bad first years": 3.5}
+    r = return_map[return_scenario]
+    rows = []
+    for age in compare_ages:
+        df = project_portfolio(retire_age=age, return_rate=r)
+        retire_port = df.loc[df["Age"] == age, "Portfolio"].iloc[0] if age in df["Age"].values else df["Portfolio"].iloc[0]
+        end_port = df["Portfolio"].iloc[-1]
+        first_withdrawal = max(0, annual_spending() - guaranteed_income())
+        bridge_years = max(0, 65 - age)
+        healthcare_bridge = bridge_years * float(st.session_state.healthcare_monthly) * 12
+        score = int(max(0, min(100, 55 + (end_port / max(portfolio_total(), 1)) * 20 - bridge_years * 3)))
+        rows.append({
+            "Retire Age": age,
+            "Readiness Score": score,
+            "Portfolio at Retirement": retire_port,
+            "Ending Portfolio": end_port,
+            "First-Year Portfolio Need": first_withdrawal,
+            "Healthcare Bridge": healthcare_bridge,
+        })
+    return pd.DataFrame(rows)
 
 
 def show_phase2():
-    st.markdown("# Phase 2 — Retirement Lab")
+    st.title("Phase 2 — Retirement Lab")
     st.write("Compare retirement ages, test withdrawal pressure, and see whether the plan survives through your planning age.")
+    st.markdown("<div class='soft-box'>This lab uses your Phase 1 inputs. Try different retirement ages and watch how the ending portfolio, bridge years, and first-year withdrawal needs change.</div>", unsafe_allow_html=True)
 
-    st.markdown(
-        """
-        <div class="blue-banner">
-        This lab uses your Phase 1 inputs. Try different retirement ages and watch how the ending portfolio, bridge years,
-        and first-year withdrawal needs change.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        retirement_age_options = list(range(55, 71))
-        default_compare_ages = []
-        for age in [int(st.session_state.phase1_retire_age), 62, 65, 67]:
-            if age in retirement_age_options and age not in default_compare_ages:
-                default_compare_ages.append(age)
-
-        compare_ages = st.multiselect(
-            "Retirement ages to compare",
-            options=retirement_age_options,
-            default=default_compare_ages,
-            key="phase2_compare_ages",
-        )
-    with c2:
-        stress_mode = st.selectbox(
-            "Market assumption",
-            ["Base return", "Conservative return", "Bad first decade"],
-            key="phase2_stress_mode",
-        )
-    with c3:
-        healthcare_until = st.number_input(
-            "Healthcare bridge until age",
-            min_value=60,
-            max_value=70,
-            value=65,
-            key="phase2_healthcare_until",
-        )
-
+    default_ages = sorted(set([st.session_state.retire_age, 62, 65, 67]))
+    c1, c2 = st.columns([2, 1])
+    compare_ages = c1.multiselect("Retirement ages to compare", list(range(50, 76)), default=default_ages, key="phase2_compare_ages_widget")
+    scenario = c2.selectbox("Return scenario", ["Conservative", "Base", "Bad first years"], index=1)
     if not compare_ages:
         st.warning("Choose at least one retirement age to compare.")
         return
 
-    if stress_mode == "Base return":
-        scenario_return = st.session_state.phase1_growth_return
-    elif stress_mode == "Conservative return":
-        scenario_return = 5.0
-    else:
-        scenario_return = max(0.0, st.session_state.phase1_growth_return - 3.0)
+    result = phase2_table(compare_ages, scenario)
+    display = result.copy()
+    for col in ["Portfolio at Retirement", "Ending Portfolio", "First-Year Portfolio Need", "Healthcare Bridge"]:
+        display[col] = display[col].apply(money)
+    st.dataframe(display, use_container_width=True, hide_index=True)
 
-    rows = []
     fig = go.Figure()
-    for age in sorted(set(compare_ages)):
-        ages, balances, withdrawals, ending, first_wd, success = project_portfolio(age, scenario_return)
-        bridge_years = max(0, min(healthcare_until, st.session_state.phase1_ss_age) - age)
-        healthcare_bridge = max(0, healthcare_until - age) * st.session_state.phase1_healthcare_bridge
-        rows.append({
-            "Retire Age": age,
-            "Bridge Years to Medicare": max(0, healthcare_until - age),
-            "First-Year Withdrawal": first_wd,
-            "Estimated Healthcare Bridge": healthcare_bridge,
-            "Ending Portfolio": ending,
-            "Status": "On Track" if success else "At Risk",
-        })
-        fig.add_trace(go.Scatter(x=ages, y=balances, mode="lines", name=f"Retire at {age}"))
-
-    df = pd.DataFrame(rows)
-
-    st.subheader("Scenario Comparison")
-    st.dataframe(
-        df.style.format({
-            "First-Year Withdrawal": "${:,.0f}",
-            "Estimated Healthcare Bridge": "${:,.0f}",
-            "Ending Portfolio": "${:,.0f}",
-        }),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    st.subheader("Portfolio Projection by Retirement Age")
-    fig.update_layout(height=420, margin=dict(l=20, r=20, t=30, b=20), yaxis_title="Projected Portfolio")
+    fig.add_trace(go.Bar(x=result["Retire Age"], y=result["Ending Portfolio"], name="Ending Portfolio"))
+    fig.update_layout(height=350, title="Ending Portfolio by Retirement Age", yaxis_tickprefix="$", xaxis_title="Retirement Age")
     st.plotly_chart(fig, use_container_width=True)
 
-    best = df.sort_values("Ending Portfolio", ascending=False).iloc[0]
-    lowest_withdrawal = df.sort_values("First-Year Withdrawal", ascending=True).iloc[0]
-
-    a, b, c = st.columns(3)
-    a.metric("Strongest Ending Portfolio", f"Retire at {int(best['Retire Age'])}", money(best["Ending Portfolio"]))
-    b.metric("Lowest First-Year Withdrawal", f"Retire at {int(lowest_withdrawal['Retire Age'])}", money(lowest_withdrawal["First-Year Withdrawal"]))
-    c.metric("Market Assumption", f"{scenario_return:.1f}%")
-
-    st.subheader("Plain-English Takeaway")
-    if best["Ending Portfolio"] <= 0:
-        st.error("This set of assumptions is under pressure. Try delaying retirement, lowering spending, increasing guaranteed income, or reducing early healthcare bridge costs.")
-    elif st.session_state.phase1_retire_age < 62:
-        st.info("Early retirement can work, but the bridge years before Social Security and Medicare are the pressure point to watch.")
-    else:
-        st.success("The plan looks more stable when retirement age, guaranteed income, and portfolio withdrawals are balanced.")
-
-
-
-# ----------------------------
-# Phase 3 — Income & Tax
-# ----------------------------
-def estimate_future_rmd_balance():
-    start_age = st.session_state.phase1_age
-    rmd_age = st.session_state.phase3_rmd_age
-    years = max(0, rmd_age - start_age)
-    traditional_balance = st.session_state.phase1_portfolio * (st.session_state.phase3_taxable_balance_pct / 100)
-    growth = st.session_state.phase1_growth_return / 100
-    return traditional_balance * ((1 + growth) ** years)
+    best = result.sort_values("Readiness Score", ascending=False).iloc[0]
+    st.markdown(f"<div class='success-box'><b>Plain-English takeaway:</b> Based on the current assumptions, retiring at <b>{int(best['Retire Age'])}</b> produces the strongest score in this comparison. The biggest pressure points are healthcare bridge years before Medicare and the annual portfolio withdrawal need.</div>", unsafe_allow_html=True)
 
 
 def show_phase3():
-    st.markdown("# Phase 3 — Income & Tax")
-    st.write("Estimate retirement income sources, withdrawal needs, taxes, Roth conversion pressure, ACA planning, and future RMD risk.")
+    st.title("Phase 3 — Income & Tax")
+    st.write("Estimate retirement income sources, portfolio withdrawal need, tax pressure, Roth conversion impact, and future RMD risk.")
+    st.markdown("<div class='soft-box'>This is a planning estimate, not tax advice. The goal is to show pressure points and help users know what to ask a financial or tax professional.</div>", unsafe_allow_html=True)
 
-    st.markdown(
-        """
-        <div class="blue-banner">
-        This is a planning estimate, not tax advice. Use it to see the direction of your income and tax picture before working with a CPA or financial planner.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    c1, c2, c3 = st.columns(3)
+    c1.number_input("Estimated effective tax rate (%)", min_value=0.0, max_value=40.0, step=0.5, key="tax_rate")
+    c2.number_input("Annual Roth conversion to test", min_value=0, step=5000, key="roth_conversion")
+    c3.number_input("ACA target MAGI", min_value=0, step=5000, key="aca_target_income")
 
-    tabs = st.tabs([
-        "1. Income Sources",
-        "2. Withdrawal Need",
-        "3. Tax Estimate",
-        "4. Roth Conversion Test",
-        "5. RMD Preview",
-        "6. Takeaway",
-    ])
+    gross_income = guaranteed_income()
+    spending = annual_spending()
+    withdrawal_need = max(0, spending - gross_income)
+    estimated_tax = (gross_income + withdrawal_need + st.session_state.roth_conversion) * st.session_state.tax_rate / 100
+    after_tax_gap = max(0, spending + estimated_tax - gross_income)
+    rmd_age = 75
+    years_to_rmd = max(0, rmd_age - st.session_state.age)
+    future_traditional = st.session_state.traditional * ((1 + st.session_state.growth_return / 100) ** years_to_rmd)
+    estimated_rmd = future_traditional / 24.6 if years_to_rmd >= 0 else 0
 
-    base_ss = st.session_state.phase1_social_security
-    if st.session_state.phase1_spouse_enabled:
-        base_ss += st.session_state.phase1_spouse_ss
+    a, b, c, d = st.columns(4)
+    a.metric("Guaranteed Income", money(gross_income))
+    b.metric("Portfolio Withdrawal Need", money(withdrawal_need))
+    c.metric("Estimated Tax", money(estimated_tax))
+    d.metric("Estimated First RMD", money(estimated_rmd))
 
-    with tabs[0]:
-        st.subheader("Income Sources")
-        st.write("Add guaranteed and semi-guaranteed income that may reduce portfolio withdrawals.")
+    income_df = pd.DataFrame({
+        "Source": ["Social Security", "Pension", "Other Income", "Portfolio Withdrawal"],
+        "Amount": [st.session_state.social_security, st.session_state.pension_income, st.session_state.other_income, withdrawal_need],
+    })
+    fig = go.Figure(data=[go.Pie(labels=income_df["Source"], values=income_df["Amount"], hole=0.55)])
+    fig.update_layout(height=340, title="Retirement Income Mix")
+    st.plotly_chart(fig, use_container_width=True)
 
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.metric("Social Security", money(base_ss))
-        with c2:
-            st.number_input("Annual pension income", min_value=0, step=1000, key="phase3_pension")
-        with c3:
-            st.number_input("Annual part-time income", min_value=0, step=1000, key="phase3_part_time")
-        with c4:
-            st.number_input("Rental / other income", min_value=0, step=1000, key="phase3_rental_income")
-
-        st.number_input("Other annual income", min_value=0, step=1000, key="phase3_other_income")
-
-        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
-        st.success(f"Estimated annual non-portfolio income: {money(total_income)}")
-
-    with tabs[1]:
-        st.subheader("Withdrawal Need")
-        spending = annual_spending()
-        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
-        withdrawal_need = max(0, spending - total_income)
-        withdrawal_rate = withdrawal_need / max(st.session_state.phase1_portfolio, 1) * 100
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Annual Spending", money(spending))
-        c2.metric("Non-Portfolio Income", money(total_income))
-        c3.metric("Portfolio Withdrawal Need", money(withdrawal_need), f"{withdrawal_rate:.1f}% of portfolio")
-
-        if withdrawal_rate <= 4:
-            st.success("Withdrawal pressure looks reasonable under a basic 4% rule check.")
-        elif withdrawal_rate <= 6:
-            st.warning("Withdrawal pressure is moderate. This may work, but timing, taxes, and market returns matter more.")
-        else:
-            st.error("Withdrawal pressure is high. Consider reducing spending, delaying retirement, adding income, or adjusting the plan.")
-
-    with tabs[2]:
-        st.subheader("Tax Estimate")
-        st.write("Use simple effective tax rates for now. Later we can replace this with bracket-based federal and state logic.")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.slider("Estimated federal effective tax rate", 0.0, 35.0, key="phase3_federal_tax_rate")
-        with c2:
-            st.slider("Estimated state/local effective tax rate", 0.0, 15.0, key="phase3_state_tax_rate")
-
-        spending = annual_spending()
-        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
-        withdrawal_need = max(0, spending - total_income)
-        taxable_income_est = max(0, withdrawal_need + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income)
-        total_tax_rate = (st.session_state.phase3_federal_tax_rate + st.session_state.phase3_state_tax_rate) / 100
-        tax_est = taxable_income_est * total_tax_rate
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Estimated Taxable Income", money(taxable_income_est))
-        c2.metric("Estimated Annual Tax", money(tax_est))
-        c3.metric("After-Tax Withdrawal Need", money(withdrawal_need + tax_est))
-
-    with tabs[3]:
-        st.subheader("Roth Conversion Test")
-        st.write("Test whether converting some traditional retirement money to Roth could lower future tax/RMD pressure.")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.number_input("Annual Roth conversion to test", min_value=0, step=5000, key="phase3_roth_conversion")
-        with c2:
-            st.slider("Estimated conversion tax rate", 0.0, 40.0, key="phase3_conversion_tax_rate")
-
-        conversion_tax = st.session_state.phase3_roth_conversion * (st.session_state.phase3_conversion_tax_rate / 100)
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Conversion Amount", money(st.session_state.phase3_roth_conversion))
-        c2.metric("Estimated Tax Cost", money(conversion_tax))
-        c3.metric("Net Amount Shifted", money(max(0, st.session_state.phase3_roth_conversion - conversion_tax)))
-
-        if st.session_state.phase3_roth_conversion > 0:
-            st.info("This does not prove a Roth conversion is right, but it shows the upfront tax cost and helps compare against future RMD pressure.")
-        else:
-            st.info("Enter a test conversion amount to see the estimated tax cost.")
-
-    with tabs[4]:
-        st.subheader("RMD Preview")
-        st.write("Estimate how large traditional pre-tax balances could become before RMDs begin.")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.number_input("RMD starting age", min_value=73, max_value=80, key="phase3_rmd_age")
-        with c2:
-            st.slider("Percent of portfolio that is traditional/pre-tax", 0.0, 100.0, key="phase3_taxable_balance_pct")
-
-        future_rmd_balance = estimate_future_rmd_balance()
-        estimated_first_rmd = future_rmd_balance / 24.6
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Projected Pre-Tax Balance", money(future_rmd_balance))
-        c2.metric("Estimated First RMD", money(estimated_first_rmd))
-        c3.metric("RMD Risk", "High" if estimated_first_rmd > 75000 else "Moderate" if estimated_first_rmd > 35000 else "Lower")
-
-        if estimated_first_rmd > 75000:
-            st.warning("Future RMDs could create tax pressure. Roth conversions before RMD age may be worth testing.")
-        else:
-            st.success("Estimated RMD pressure appears manageable under these assumptions.")
-
-    with tabs[5]:
-        st.subheader("Plain-English Takeaway")
-
-        spending = annual_spending()
-        total_income = base_ss + st.session_state.phase3_pension + st.session_state.phase3_part_time + st.session_state.phase3_rental_income + st.session_state.phase3_other_income
-        withdrawal_need = max(0, spending - total_income)
-        withdrawal_rate = withdrawal_need / max(st.session_state.phase1_portfolio, 1) * 100
-        future_rmd_balance = estimate_future_rmd_balance()
-        estimated_first_rmd = future_rmd_balance / 24.6
-
-        points = []
-        if withdrawal_rate <= 4:
-            points.append("Your retirement income sources cover enough spending that portfolio withdrawals look reasonable.")
-        elif withdrawal_rate <= 6:
-            points.append("Your withdrawal need is workable but needs careful monitoring, especially in the first 5–10 years.")
-        else:
-            points.append("Your withdrawal need is high, so the plan may need a retirement delay, lower spending, or more guaranteed income.")
-
-        if estimated_first_rmd > 75000:
-            points.append("Your future RMD estimate is large enough that Roth conversion planning may become important.")
-        else:
-            points.append("Your future RMD estimate does not look extreme under these assumptions.")
-
-        if st.session_state.phase1_retire_age < 65:
-            points.append("Because retirement is before Medicare, healthcare bridge costs should stay visible in the plan.")
-
-        for point in points:
-            st.write(f"• {point}")
-
-        st.markdown("### Next best move")
-        if withdrawal_rate > 6:
-            st.error("Focus first on lowering spending, delaying retirement, or increasing guaranteed income.")
-        elif estimated_first_rmd > 75000:
-            st.warning("Run several Roth conversion scenarios before RMD age.")
-        else:
-            st.success("Move forward to Phase 4 Lifestyle once your income and tax assumptions feel reasonable.")
-
-# ----------------------------
-# Placeholder Pages
-# ----------------------------
-def locked_or_placeholder(title, desc):
-    st.markdown(f"# {title}")
-    st.write(desc)
-    if not st.session_state.premium_demo:
-        st.markdown(
-            """
-            <div class="locked-card">
-                <h3>Premium feature</h3>
-                <p>Upgrade to unlock this planning module.</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    if st.session_state.roth_conversion > 0:
+        st.info(f"Testing a {money(st.session_state.roth_conversion)} annual Roth conversion increases near-term taxable income, but may reduce future RMD pressure if repeated strategically.")
+    if gross_income + withdrawal_need > st.session_state.aca_target_income:
+        st.warning("Your modeled income may be above the ACA target. This could reduce healthcare subsidy eligibility before Medicare.")
     else:
-        st.info("This module is ready for the next build step.")
+        st.success("Your modeled income is near or below the ACA target. That may help preserve healthcare subsidy flexibility before Medicare.")
 
-# ----------------------------
-# Router
-# ----------------------------
-if page == "Dashboard":
+    st.markdown(f"<div class='success-box'><b>Plain-English takeaway:</b> Your current spending creates an estimated portfolio withdrawal need of <b>{money(withdrawal_need)}</b> per year. The key tax planning question is whether Roth conversions now can reduce RMD and survivor-tax pressure later.</div>", unsafe_allow_html=True)
+
+
+# -------------------- Phase 4 Lifestyle Data --------------------
+STATE_DATA = [
+    {"State":"Florida", "Tax":86, "Cost":62, "Healthcare":82, "Lifestyle":92, "Climate":88, "Golf":90, "Watch-outs":"Insurance, hurricanes, crowded coastal markets", "Places":"Sarasota; The Villages; St. Augustine; Naples"},
+    {"State":"South Carolina", "Tax":88, "Cost":77, "Healthcare":76, "Lifestyle":90, "Climate":82, "Golf":88, "Watch-outs":"Humidity, hurricane risk near coast, healthcare varies by city", "Places":"Hilton Head; Greenville; Charleston suburbs; Aiken"},
+    {"State":"Tennessee", "Tax":90, "Cost":82, "Healthcare":78, "Lifestyle":80, "Climate":74, "Golf":76, "Watch-outs":"Sales tax, hot summers, limited coastal lifestyle", "Places":"Knoxville; Chattanooga; Franklin; Tellico Village"},
+    {"State":"North Carolina", "Tax":74, "Cost":72, "Healthcare":80, "Lifestyle":86, "Climate":78, "Golf":92, "Watch-outs":"State income tax, coastal hurricane exposure", "Places":"Pinehurst; Wilmington; Asheville; Raleigh suburbs"},
+    {"State":"Arizona", "Tax":76, "Cost":68, "Healthcare":84, "Lifestyle":88, "Climate":76, "Golf":96, "Watch-outs":"Extreme summer heat, water risk, rising housing costs", "Places":"Scottsdale; Tucson; Mesa; Green Valley"},
+    {"State":"Texas", "Tax":82, "Cost":70, "Healthcare":78, "Lifestyle":82, "Climate":70, "Golf":82, "Watch-outs":"Property taxes, heat, large driving distances", "Places":"Georgetown; Frisco; San Antonio; McAllen"},
+    {"State":"Michigan", "Tax":70, "Cost":73, "Healthcare":84, "Lifestyle":74, "Climate":54, "Golf":72, "Watch-outs":"Winter climate, snowbird travel cost, property tax varies", "Places":"Traverse City; Grand Rapids; Ann Arbor; Plymouth/Canton"},
+    {"State":"Nevada", "Tax":90, "Cost":66, "Healthcare":76, "Lifestyle":82, "Climate":76, "Golf":84, "Watch-outs":"Healthcare access outside metros, summer heat", "Places":"Henderson; Reno; Mesquite; Summerlin"},
+    {"State":"Georgia", "Tax":75, "Cost":76, "Healthcare":78, "Lifestyle":82, "Climate":78, "Golf":80, "Watch-outs":"Traffic near Atlanta, humidity, property tax varies", "Places":"Savannah; Peachtree City; Augusta; Blue Ridge"},
+    {"State":"California", "Tax":48, "Cost":38, "Healthcare":90, "Lifestyle":94, "Climate":94, "Golf":88, "Watch-outs":"High taxes, high housing cost, wildfire risk", "Places":"San Diego; Palm Springs; Santa Barbara; Monterey"},
+]
+
+PLACE_DATA = [
+    {"Place":"Sarasota", "State":"Florida", "Type":"Coastal / Arts / Beach", "Affordability":62, "Healthcare":86, "Lifestyle":95, "Climate":88, "Golf":90, "Why":"Beach lifestyle, arts, restaurants, golf, strong retiree infrastructure.", "Watch-outs":"Housing and insurance can be expensive; hurricane exposure."},
+    {"Place":"Hilton Head", "State":"South Carolina", "Type":"Coastal / Golf", "Affordability":58, "Healthcare":76, "Lifestyle":96, "Climate":84, "Golf":97, "Why":"Premier golf, beaches, bike paths, upscale retirement feel.", "Watch-outs":"Expensive housing and coastal storm exposure."},
+    {"Place":"The Villages", "State":"Florida", "Type":"Active Adult / Golf Cart", "Affordability":72, "Healthcare":78, "Lifestyle":92, "Climate":88, "Golf":96, "Why":"Highly social active-adult lifestyle with golf-cart convenience.", "Watch-outs":"Not for everyone; lifestyle is community-specific."},
+    {"Place":"Scottsdale", "State":"Arizona", "Type":"Desert / Golf / Luxury", "Affordability":50, "Healthcare":84, "Lifestyle":94, "Climate":78, "Golf":98, "Why":"World-class golf, strong healthcare, luxury amenities.", "Watch-outs":"High housing costs and very hot summers."},
+    {"Place":"Pinehurst", "State":"North Carolina", "Type":"Golf / Village", "Affordability":72, "Healthcare":76, "Lifestyle":86, "Climate":78, "Golf":98, "Why":"One of the strongest golf-retirement destinations in the country.", "Watch-outs":"Smaller-town feel; healthcare may require regional access."},
+    {"Place":"Knoxville", "State":"Tennessee", "Type":"University / Mountains", "Affordability":82, "Healthcare":78, "Lifestyle":80, "Climate":74, "Golf":76, "Why":"No state income tax, access to mountains, lower cost of living.", "Watch-outs":"No beach lifestyle; humid summers."},
+    {"Place":"Greenville", "State":"South Carolina", "Type":"Small City / Mountains Nearby", "Affordability":77, "Healthcare":78, "Lifestyle":84, "Climate":78, "Golf":78, "Why":"Vibrant downtown, lower cost, strong lifestyle balance.", "Watch-outs":"Rapid growth can pressure housing affordability."},
+    {"Place":"Traverse City", "State":"Michigan", "Type":"Lake / Summer Lifestyle", "Affordability":58, "Healthcare":72, "Lifestyle":88, "Climate":55, "Golf":82, "Why":"Excellent summer lifestyle, water, wineries, golf, Michigan ties.", "Watch-outs":"Winter climate and seasonal tourism pressure."},
+    {"Place":"Grand Rapids", "State":"Michigan", "Type":"Mid-size City / Healthcare", "Affordability":73, "Healthcare":84, "Lifestyle":74, "Climate":54, "Golf":72, "Why":"Strong healthcare, reasonable cost, close to west Michigan lifestyle.", "Watch-outs":"Cold winters; not a beach retirement year-round."},
+    {"Place":"Chattanooga", "State":"Tennessee", "Type":"River City / Outdoors", "Affordability":80, "Healthcare":75, "Lifestyle":82, "Climate":74, "Golf":74, "Why":"Scenic river/mountain setting, lower taxes, outdoor lifestyle.", "Watch-outs":"Healthcare depth and humidity should be reviewed."},
+]
+
+
+def estimate_state_tax(row):
+    income = guaranteed_income() + max(0, annual_spending() - guaranteed_income())
+    tax_sensitivity = (100 - row["Tax"]) / 100
+    return income * tax_sensitivity * 0.08
+
+
+def state_score(row, weights):
+    return (
+        row["Tax"] * weights["Tax"] +
+        row["Cost"] * weights["Cost"] +
+        row["Healthcare"] * weights["Healthcare"] +
+        row["Lifestyle"] * weights["Lifestyle"] +
+        row["Climate"] * weights["Climate"] +
+        row["Golf"] * weights["Golf"]
+    ) / sum(weights.values())
+
+
+def place_score(row, weights):
+    # Place-level data has no separate tax score, so borrow state tax/cost context.
+    state_row = next(s for s in STATE_DATA if s["State"] == row["State"])
+    return (
+        state_row["Tax"] * weights["Tax"] +
+        row["Affordability"] * weights["Cost"] +
+        row["Healthcare"] * weights["Healthcare"] +
+        row["Lifestyle"] * weights["Lifestyle"] +
+        row["Climate"] * weights["Climate"] +
+        row["Golf"] * weights["Golf"]
+    ) / sum(weights.values())
+
+
+def show_phase4():
+    st.title("Phase 4 — Lifestyle & Best Places to Retire")
+    st.write("Compare states and places based on taxes, cost, healthcare, climate, golf/recreation, lifestyle fit, and your personal priorities.")
+    st.markdown("<div class='soft-box'>This is where the retirement plan becomes personal. A financially possible retirement should also fit the life you actually want.</div>", unsafe_allow_html=True)
+
+    st.subheader("What matters most to you?")
+    c1, c2, c3 = st.columns(3)
+    w_tax = c1.slider("Tax importance", 1, 10, 8, key="p4_tax_weight")
+    w_cost = c2.slider("Cost of living importance", 1, 10, 7, key="p4_cost_weight")
+    w_health = c3.slider("Healthcare importance", 1, 10, 8, key="p4_health_weight")
+    c4, c5, c6 = st.columns(3)
+    w_life = c4.slider("Lifestyle importance", 1, 10, 8, key="p4_lifestyle_weight")
+    w_climate = c5.slider("Climate importance", 1, 10, 7, key="p4_climate_weight")
+    w_golf = c6.slider("Golf / recreation importance", 1, 10, 7, key="p4_golf_weight")
+
+    weights = {"Tax": w_tax, "Cost": w_cost, "Healthcare": w_health, "Lifestyle": w_life, "Climate": w_climate, "Golf": w_golf}
+
+    c1, c2, c3 = st.columns(3)
+    preferred = c1.multiselect("Preferred states, optional", [s["State"] for s in STATE_DATA], default=[], key="p4_preferred")
+    avoid = c2.multiselect("States to avoid, optional", [s["State"] for s in STATE_DATA], default=[], key="p4_avoid")
+    snowbird = c3.checkbox("Interested in snowbird strategy?", value=True, key="p4_snowbird")
+
+    states = pd.DataFrame(STATE_DATA)
+    states = states[~states["State"].isin(avoid)].copy()
+    states["Personalized Score"] = states.apply(lambda r: state_score(r, weights), axis=1)
+    if preferred:
+        states.loc[states["State"].isin(preferred), "Personalized Score"] += 3
+    states["Estimated Annual State/Local Tax"] = states.apply(estimate_state_tax, axis=1)
+    states = states.sort_values("Personalized Score", ascending=False).reset_index(drop=True)
+
+    top_state = states.iloc[0]
+    st.markdown(f"<div class='success-box'>Top state fit: <b>{top_state['State']}</b> with a personalized score of <b>{top_state['Personalized Score']:.0f}/100</b>.</div>", unsafe_allow_html=True)
+
+    fig = go.Figure()
+    top10 = states.head(10).sort_values("Personalized Score")
+    fig.add_trace(go.Bar(y=top10["State"], x=top10["Personalized Score"], orientation="h", text=top10["Personalized Score"].round(0)))
+    fig.update_layout(height=420, title="Top Retirement States — Personalized Score", xaxis_title="Score", margin=dict(l=20, r=20, t=50, b=20))
+    st.plotly_chart(fig, use_container_width=True)
+
+    state_display = states[["State", "Personalized Score", "Tax", "Cost", "Healthcare", "Lifestyle", "Climate", "Golf", "Estimated Annual State/Local Tax", "Places", "Watch-outs"]].copy()
+    state_display["Personalized Score"] = state_display["Personalized Score"].round(0).astype(int)
+    state_display["Estimated Annual State/Local Tax"] = state_display["Estimated Annual State/Local Tax"].apply(money)
+    st.subheader("State Comparison Table")
+    st.dataframe(state_display, use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.subheader("City / Place-Level Recommendations")
+    filter_states = st.multiselect("Filter places by state", [s["State"] for s in STATE_DATA], default=[], key="p4_place_filter")
+    places = pd.DataFrame(PLACE_DATA)
+    if filter_states:
+        places = places[places["State"].isin(filter_states)].copy()
+    places["Recommended Fit Score"] = places.apply(lambda r: place_score(r, weights), axis=1)
+    places = places.sort_values("Recommended Fit Score", ascending=False).reset_index(drop=True)
+    top_place = places.iloc[0]
+    st.markdown(f"<div class='success-box'>Top place match: <b>{top_place['Place']}, {top_place['State']}</b> with a fit score of <b>{top_place['Recommended Fit Score']:.0f}/100</b>.</div>", unsafe_allow_html=True)
+
+    fig2 = go.Figure()
+    top_places = places.head(10).sort_values("Recommended Fit Score")
+    fig2.add_trace(go.Bar(y=top_places["Place"] + ", " + top_places["State"], x=top_places["Recommended Fit Score"], orientation="h", text=top_places["Recommended Fit Score"].round(0)))
+    fig2.update_layout(height=430, title="Top Places to Retire — Personalized Fit", xaxis_title="Fit Score", margin=dict(l=20, r=20, t=50, b=20))
+    st.plotly_chart(fig2, use_container_width=True)
+
+    place_display = places[["Place", "State", "Type", "Recommended Fit Score", "Affordability", "Healthcare", "Lifestyle", "Climate", "Golf", "Why", "Watch-outs"]].copy()
+    place_display["Recommended Fit Score"] = place_display["Recommended Fit Score"].round(0).astype(int)
+    st.dataframe(place_display, use_container_width=True, hide_index=True)
+
+    st.subheader("Place Detail")
+    choice = st.selectbox("Choose a place to review", (places["Place"] + ", " + places["State"]).tolist(), key="p4_place_detail")
+    selected = places[(places["Place"] + ", " + places["State"]) == choice].iloc[0]
+    d1, d2, d3, d4, d5 = st.columns(5)
+    d1.metric("Fit Score", f"{selected['Recommended Fit Score']:.0f}/100")
+    d2.metric("Affordability", f"{selected['Affordability']}/100")
+    d3.metric("Healthcare", f"{selected['Healthcare']}/100")
+    d4.metric("Lifestyle", f"{selected['Lifestyle']}/100")
+    d5.metric("Golf / Rec", f"{selected['Golf']}/100")
+    c1, c2 = st.columns(2)
+    c1.markdown(f"**Why retire here**\n\n{selected['Why']}")
+    c2.markdown(f"**Watch-outs**\n\n{selected['Watch-outs']}")
+    st.markdown(f"**Community type:** {selected['Type']}")
+
+    st.divider()
+    st.subheader("State-to-State Comparison")
+    default_compare = ["Michigan", "Florida", "South Carolina"]
+    compare = st.multiselect("Choose states to compare", [s["State"] for s in STATE_DATA], default=default_compare, key="p4_state_compare")
+    compare_df = states[states["State"].isin(compare)].copy()
+    if not compare_df.empty:
+        fig3 = go.Figure()
+        fig3.add_trace(go.Bar(x=compare_df["State"], y=compare_df["Personalized Score"], name="Personalized Score"))
+        fig3.add_trace(go.Bar(x=compare_df["State"], y=compare_df["Tax"], name="Tax Score"))
+        fig3.update_layout(barmode="group", height=360, title="Base vs Personalized Retirement Fit")
+        st.plotly_chart(fig3, use_container_width=True)
+        st.dataframe(compare_df[["State", "Personalized Score", "Tax", "Cost", "Healthcare", "Lifestyle", "Climate", "Golf", "Watch-outs"]], use_container_width=True, hide_index=True)
+
+    if snowbird:
+        st.markdown("<div class='warn-box'><b>Snowbird idea:</b> Consider keeping Michigan as your home base while testing 1–3 months in Florida, South Carolina, Arizona, or Tennessee before buying. This avoids making a permanent move before confirming lifestyle, healthcare, taxes, and insurance reality.</div>", unsafe_allow_html=True)
+
+    st.markdown(f"<div class='success-box'><b>Plain-English recommendation:</b> Based on your priorities, start deeper research with <b>{top_place['Place']}, {top_place['State']}</b> and compare it against your current Michigan lifestyle. The next step is to verify housing cost, property taxes, insurance, healthcare networks, and how it feels during both peak and off-season months.</div>", unsafe_allow_html=True)
+
+
+def placeholder(title):
+    st.title(title)
+    st.info("This phase is coming next. The goal is to build one stable phase at a time.")
+
+if nav == "Dashboard":
     show_dashboard()
-elif page == "Phase 1 — Foundation":
+elif nav == "Phase 1 — Foundation":
     show_phase1()
-elif page == "Phase 2 — Retirement Lab":
+elif nav == "Phase 2 — Retirement Lab":
     show_phase2()
-elif page == "Phase 3 — Income & Tax":
+elif nav == "Phase 3 — Income & Tax":
     show_phase3()
-elif page == "Phase 4 — Lifestyle":
-    locked_or_placeholder("Phase 4 — Lifestyle", "Compare best places to retire, lifestyle fit, state taxes, and snowbird options.")
-elif page == "Phase 5 — My Plans":
-    locked_or_placeholder("Phase 5 — My Plans", "Save scenarios, compare plans, and generate your final retirement blueprint.")
+elif nav == "Phase 4 — Lifestyle":
+    show_phase4()
+elif nav == "Phase 5 — My Plans":
+    placeholder("Phase 5 — My Plans")
+elif nav == "Reports":
+    placeholder("Reports")
+elif nav == "AI Coach":
+    placeholder("AI Coach")
 else:
-    locked_or_placeholder(page, "This section will be built after the foundation is stable.")
+    placeholder("Resources")
