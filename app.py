@@ -10,7 +10,7 @@ st.set_page_config(page_title="Retirement Blueprint 101", layout="wide")
 # ------------------------------------------------------------
 # Clean build marker
 # ------------------------------------------------------------
-BUILD_LABEL = "Clean Phase 5 + Tax Estimator + AI Coach + Resources v1"
+BUILD_LABEL = "Clean Phase 5 + Tax Estimator + AI Coach + Resources + SS Claiming Adjustment v1"
 
 # ------------------------------------------------------------
 # Styling
@@ -88,6 +88,7 @@ def init_state():
         "pension_income": 0,
         "social_security": 24000,
         "ss_start_age": 62,
+        "ss_fra_age": 67,
         "portfolio": 850000,
         "traditional": 680000,
         "roth": 110000,
@@ -124,6 +125,7 @@ def init_state():
         "spouse_income": 0,
         "spouse_ss": 24000,
         "spouse_ss_start_age": 62,
+        "spouse_ss_fra_age": 67,
         "phase2_compare_ages": [58, 62, 65, 67],
         "sidebar_age": 55,
         "sidebar_retire_age": 58,
@@ -141,13 +143,13 @@ if "saved_plans" not in st.session_state:
 PLAN_INPUT_KEYS = [
     "plan_name", "name", "age", "retire_age", "plan_age",
     "current_income", "monthly_spending", "other_income", "pension_income",
-    "social_security", "ss_start_age", "portfolio", "traditional", "roth",
+    "social_security", "ss_start_age", "ss_fra_age", "portfolio", "traditional", "roth",
     "taxable_cash", "hsa_balance", "rule55_eligible", "aca_sensitive", "rmd_concern", "market_downturn", "bucket1_balance", "bucket2_balance", "bucket1_return",
     "bucket2_return", "bucket1_years", "home_equity", "home_value", "mortgage",
     "healthcare_monthly", "inflation", "growth_return", "safe_return",
     "tax_rate", "roth_conversion", "aca_target_income",
     "filing_status", "tax_year", "state_tax_rate", "taxable_ss_percent", "other_taxable_income", "itemized_deductions", "use_itemized",
-    "spouse_enabled", "spouse_age", "spouse_income", "spouse_ss", "spouse_ss_start_age",
+    "spouse_enabled", "spouse_age", "spouse_income", "spouse_ss", "spouse_ss_start_age", "spouse_ss_fra_age",
     "phase2_compare_ages", "sidebar_age", "sidebar_retire_age", "sidebar_monthly_spending",
     "p5_plan_name", "p5_tags", "p5_notes",
 ]
@@ -232,9 +234,40 @@ def annual_spending():
     return float(st.session_state.monthly_spending) * 12
 
 
+def ss_claiming_factor(claim_age, fra_age=67):
+    """Approximate Social Security claiming adjustment relative to full retirement age.
+
+    Uses SSA's common reduction/credit rules: early filing reduces benefits by
+    5/9 of 1% per month for the first 36 months before FRA, then 5/12 of 1%
+    per month beyond that. Delaying after FRA earns about 2/3 of 1% per month,
+    up to age 70.
+    """
+    claim_age = float(claim_age)
+    fra_age = float(fra_age)
+    if claim_age < fra_age:
+        months_early = round((fra_age - claim_age) * 12)
+        first_band = min(months_early, 36) * (5 / 9 / 100)
+        second_band = max(0, months_early - 36) * (5 / 12 / 100)
+        return max(0.0, 1 - first_band - second_band)
+    months_delayed = round((min(claim_age, 70) - fra_age) * 12)
+    return 1 + months_delayed * (2 / 3 / 100)
+
+
+def adjusted_user_social_security():
+    base = float(st.session_state.get("social_security", 0))
+    return base * ss_claiming_factor(st.session_state.get("ss_start_age", 62), st.session_state.get("ss_fra_age", 67))
+
+
+def adjusted_spouse_social_security():
+    if not st.session_state.get("spouse_enabled", False):
+        return 0.0
+    base = float(st.session_state.get("spouse_ss", 0))
+    return base * ss_claiming_factor(st.session_state.get("spouse_ss_start_age", 62), st.session_state.get("spouse_ss_fra_age", 67))
+
+
 def guaranteed_income():
-    spouse = st.session_state.spouse_ss if st.session_state.spouse_enabled else 0
-    return float(st.session_state.social_security) + float(st.session_state.pension_income) + float(st.session_state.other_income) + float(spouse)
+    spouse = adjusted_spouse_social_security()
+    return adjusted_user_social_security() + float(st.session_state.pension_income) + float(st.session_state.other_income) + float(spouse)
 
 
 def portfolio_total():
@@ -540,9 +573,35 @@ def show_phase1():
 
     with tabs[3]:
         st.subheader("Social Security")
-        c1, c2 = st.columns(2)
-        c1.number_input("Your annual Social Security", min_value=0, step=1000, key="social_security", help="Your estimated annual Social Security benefit at the claiming age you selected. Use your SSA.gov estimate if available.")
-        c2.slider("Your Social Security start age", 62, 70, key="ss_start_age", help="The age you expect to start Social Security. Claiming earlier usually lowers monthly benefits; delaying can increase them.")
+        c1, c2, c3 = st.columns(3)
+        c1.number_input(
+            "Your annual Social Security at full retirement age",
+            min_value=0,
+            step=1000,
+            key="social_security",
+            help="Enter your estimated annual benefit at full retirement age from SSA.gov. The app will adjust it up or down when you change the claiming age."
+        )
+        c2.slider(
+            "Your Social Security start age",
+            62,
+            70,
+            key="ss_start_age",
+            help="Choose when you plan to claim. Filing before full retirement age reduces benefits; delaying after full retirement age increases benefits until age 70."
+        )
+        c3.slider(
+            "Your full retirement age",
+            66,
+            67,
+            key="ss_fra_age",
+            help="Most people born in 1960 or later have a full retirement age of 67. Use 66 if that better matches your SSA estimate."
+        )
+        user_ss_factor = ss_claiming_factor(st.session_state.ss_start_age, st.session_state.ss_fra_age)
+        st.info(
+            f"Estimated Social Security at claiming age {st.session_state.ss_start_age}: "
+            f"{money(adjusted_user_social_security())} per year "
+            f"({user_ss_factor * 100:.0f}% of the full-retirement-age estimate)."
+        )
+        st.caption("This is a simplified estimate. SSA calculates benefits by month and individual birth year, so users should confirm exact numbers at SSA.gov.")
 
     with tabs[4]:
         st.subheader("Assets & Debt")
@@ -562,8 +621,16 @@ def show_phase1():
             c1, c2, c3 = st.columns(3)
             c1.number_input("Spouse age", min_value=45, max_value=90, key="spouse_age", help="Your spouse or partner’s current age. This affects retirement timing, Social Security timing, and survivor planning.")
             c2.number_input("Spouse annual income", min_value=0, step=5000, key="spouse_income", help="Your spouse or partner’s current annual earned income before taxes.")
-            c3.number_input("Spouse annual Social Security", min_value=0, step=1000, key="spouse_ss", help="Estimated annual Social Security benefit for your spouse or partner at their selected claiming age.")
-            st.slider("Spouse Social Security start age", 62, 70, key="spouse_ss_start_age", help="The age your spouse or partner expects to claim Social Security.")
+            c3.number_input("Spouse annual Social Security at full retirement age", min_value=0, step=1000, key="spouse_ss", help="Estimated annual Social Security benefit for your spouse or partner at full retirement age. The app adjusts this based on claiming age.")
+            sc1, sc2 = st.columns(2)
+            sc1.slider("Spouse Social Security start age", 62, 70, key="spouse_ss_start_age", help="The age your spouse or partner expects to claim Social Security.")
+            sc2.slider("Spouse full retirement age", 66, 67, key="spouse_ss_fra_age", help="Most people born in 1960 or later have a full retirement age of 67. Use 66 if that better matches the estimate.")
+            spouse_factor = ss_claiming_factor(st.session_state.spouse_ss_start_age, st.session_state.spouse_ss_fra_age)
+            st.info(
+                f"Estimated spouse Social Security at claiming age {st.session_state.spouse_ss_start_age}: "
+                f"{money(adjusted_spouse_social_security())} per year "
+                f"({spouse_factor * 100:.0f}% of the full-retirement-age estimate)."
+            )
         else:
             st.info("No spouse or partner is included in this plan.")
 
@@ -906,9 +973,9 @@ def calc_progressive_tax(taxable_income, brackets):
 
 
 def estimate_taxable_income_components(gross_income, withdrawal_need):
-    ss_taxable = st.session_state.social_security * (st.session_state.taxable_ss_percent / 100)
+    ss_taxable = adjusted_user_social_security() * (st.session_state.taxable_ss_percent / 100)
     if st.session_state.spouse_enabled:
-        ss_taxable += st.session_state.spouse_ss * (st.session_state.taxable_ss_percent / 100)
+        ss_taxable += adjusted_spouse_social_security() * (st.session_state.taxable_ss_percent / 100)
     ordinary_income = (
         ss_taxable
         + st.session_state.pension_income
@@ -1095,7 +1162,7 @@ def show_phase3():
 
     income_df = pd.DataFrame({
         "Source": ["Social Security", "Pension", "Other Income", "Portfolio Withdrawal"],
-        "Amount": [st.session_state.social_security, st.session_state.pension_income, st.session_state.other_income, withdrawal_need],
+        "Amount": [adjusted_user_social_security() + adjusted_spouse_social_security(), st.session_state.pension_income, st.session_state.other_income, withdrawal_need],
     })
     fig = go.Figure(data=[go.Pie(labels=income_df["Source"], values=income_df["Amount"], hole=0.55)])
     fig.update_layout(height=340, title="Retirement Income Mix")
@@ -1697,13 +1764,16 @@ def plan_context_for_ai():
         "hsa_balance": st.session_state.get("hsa_balance"),
         "home_equity": st.session_state.get("home_equity"),
         "mortgage": st.session_state.get("mortgage"),
-        "annual_social_security": st.session_state.get("social_security"),
+        "annual_social_security_fra_estimate": st.session_state.get("social_security"),
         "social_security_start_age": st.session_state.get("ss_start_age"),
+        "social_security_full_retirement_age": st.session_state.get("ss_fra_age"),
+        "annual_social_security_adjusted": adjusted_user_social_security(),
         "pension_income": st.session_state.get("pension_income"),
         "other_income": st.session_state.get("other_income"),
         "spouse_included": st.session_state.get("spouse_enabled"),
         "spouse_age": st.session_state.get("spouse_age") if st.session_state.get("spouse_enabled") else None,
-        "spouse_social_security": st.session_state.get("spouse_ss") if st.session_state.get("spouse_enabled") else None,
+        "spouse_social_security_fra_estimate": st.session_state.get("spouse_ss") if st.session_state.get("spouse_enabled") else None,
+        "spouse_social_security_adjusted": adjusted_spouse_social_security() if st.session_state.get("spouse_enabled") else None,
         "bucket1_balance": st.session_state.get("bucket1_balance"),
         "bucket1_return": st.session_state.get("bucket1_return"),
         "bucket2_balance": st.session_state.get("bucket2_balance"),
